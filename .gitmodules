@@ -1,0 +1,6 @@
+[submodule "thirdparty/lietorch"]
+	path = thirdparty/lietorch
+	url = https://github.com/princeton-vl/lietorch
+[submodule "thirdparty/eigen"]
+	path = thirdparty/eigen
+	url = https://gitlab.com/libeigen/eigen.git

@@ -1,0 +1,3 @@
+https://tartanair.blob.core.windows.net/tartanair-testing1/tartanair-test-mono-release.tar.gz
+https://tartanair.blob.core.windows.net/tartanair-testing1/tartanair-test-stereo-release.tar.gz
+https://tartanair.blob.core.windows.net/tartanair-testing1/tartanair-test-release.tar.gz
