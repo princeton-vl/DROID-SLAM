@@ -50,8 +50,8 @@ def image_stream(imagedir, calib, stride):
         image = torch.as_tensor(image).permute(2, 0, 1)
 
         intrinsics = torch.as_tensor([fx, fy, cx, cy])
-        intrinsics[0:2] *= (w1 / w0)
-        intrinsics[2:4] *= (h1 / h0)
+        intrinsics[0::2] *= (w1 / w0)
+        intrinsics[1::2] *= (h1 / h0)
 
         yield t, image, intrinsics
 
