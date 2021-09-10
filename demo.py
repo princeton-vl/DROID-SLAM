@@ -53,7 +53,7 @@ def image_stream(imagedir, calib, stride):
         intrinsics[0::2] *= (w1 / w0)
         intrinsics[1::2] *= (h1 / h0)
 
-        yield t, image, intrinsics
+        yield t, image[None], intrinsics
 
 
 if __name__ == '__main__':
