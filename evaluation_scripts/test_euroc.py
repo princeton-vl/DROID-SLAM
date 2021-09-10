@@ -126,7 +126,7 @@ if __name__ == '__main__':
     tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
 
     traj_est = PoseTrajectory3D(
-        positions_xyz=1.095 * traj_est[:,:3],
+        positions_xyz=1.10 * traj_est[:,:3],
         orientations_quat_wxyz=traj_est[:,3:],
         timestamps=np.array(tstamps))
 
@@ -134,13 +134,8 @@ if __name__ == '__main__':
 
     traj_ref, traj_est = sync.associate_trajectories(traj_ref, traj_est)
 
-    if args.stereo:
-        result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
-            pose_relation=PoseRelation.translation_part, align=True, correct_scale=False)
-
-    else:
-        result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
-            pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
+    result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
+        pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
 
     print(result)
 
