@@ -82,6 +82,7 @@ if __name__ == '__main__':
     parser.add_argument("--backend_nms", type=int, default=3)
     args = parser.parse_args()
 
+    args.stereo = False
     torch.multiprocessing.set_start_method('spawn')
 
     droid = None
@@ -92,10 +93,10 @@ if __name__ == '__main__':
             continue
 
         if not args.disable_vis:
-            show_image(image)
+            show_image(image[0])
 
         if droid is None:
-            args.image_size = [image.shape[1], image.shape[2]]
+            args.image_size = [image.shape[2], image.shape[3]]
             droid = Droid(args)
         
         droid.track(t, image, intrinsics=intrinsics)

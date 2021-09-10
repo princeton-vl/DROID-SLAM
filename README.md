@@ -15,7 +15,7 @@ Zachary Teed and Jia Deng
 }
 ```
 
-**Initial Code Release:** This repo currently provides a single GPU implementation of our monocular SLAM system. It currently contains demos, training, and evaluation scripts. 
+**Initial Code Release:** This repo currently provides a single GPU implementation of our monocular, stereo, and RGB-D SLAM systems. It currently contains demos, training, and evaluation scripts. 
 
 
 ## Requirements
