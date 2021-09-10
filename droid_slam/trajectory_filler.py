@@ -30,7 +30,7 @@ class PoseTrajectoryFiller:
     @torch.cuda.amp.autocast(enabled=True)
     def __feature_encoder(self, image):
         """ features for correlation volume """
-        return self.fnet(image).squeeze(0)
+        return self.fnet(image)
 
     def __fill(self, tstamps, images, intrinsics):
         """ fill operator """
@@ -38,7 +38,7 @@ class PoseTrajectoryFiller:
         tt = torch.as_tensor(tstamps, device="cuda")
         images = torch.stack(images, 0)
         intrinsics = torch.stack(intrinsics, 0)
-        inputs = images[None,:,[2,1,0]].to(self.device) / 255.0
+        inputs = images[:,:,[2,1,0]].to(self.device) / 255.0
         
         ### linear pose interpolation ###
         N = self.video.counter.value
@@ -62,7 +62,7 @@ class PoseTrajectoryFiller:
         fmap = self.__feature_encoder(inputs)
 
         self.video.counter.value += M
-        self.video[N:N+M] = (tt, images, Gs.data, 1, intrinsics / 8.0, fmap)
+        self.video[N:N+M] = (tt, images[:,0], Gs.data, 1, None, intrinsics / 8.0, fmap)
 
         graph = FactorGraph(self.video, self.update)
         graph.add_factors(t0.cuda(), torch.arange(N, N+M).cuda())

@@ -25,9 +25,10 @@ class DroidBackend:
         """ main update """
 
         t = self.video.counter.value
-        self.video.normalize()
+        if not self.video.stereo and not torch.any(self.video.disps_sens):
+             self.video.normalize()
 
-        graph = FactorGraph(self.video, self.update_op, corr_impl="alt", max_factors=100000)
+        graph = FactorGraph(self.video, self.update_op, corr_impl="alt", max_factors=16*t)
 
         graph.add_proximity_factors(rad=self.backend_radius, 
                                     nms=self.backend_nms, 
@@ -37,4 +38,3 @@ class DroidBackend:
         graph.update_lowmem(steps=steps)
         graph.clear_edges()
         self.video.dirty[:t] = True
-

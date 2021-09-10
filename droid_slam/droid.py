@@ -21,7 +21,7 @@ class Droid:
         self.disable_vis = args.disable_vis
 
         # store images, depth, poses, intrinsics (shared between processes)
-        self.video = DepthVideo(args.image_size, args.buffer)
+        self.video = DepthVideo(args.image_size, args.buffer, stereo=args.stereo)
 
         # filter incoming frames so that there is enough motion
         self.filterx = MotionFilter(self.net, self.video, thresh=args.filter_thresh)

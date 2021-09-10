@@ -49,7 +49,7 @@ def image_stream(datapath, image_size=[320, 512]):
         intrinsics[3] -= 8
         image = image[:, 8:-8, 16:-16]
 
-        yield t, image, intrinsics
+        yield t, image[None], intrinsics
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -73,6 +73,7 @@ if __name__ == '__main__':
     parser.add_argument("--backend_nms", type=int, default=3)
     args = parser.parse_args()
 
+    args.stereo = False
     torch.multiprocessing.set_start_method('spawn')
 
     print("Running evaluation on {}".format(args.datapath))
@@ -94,7 +95,6 @@ if __name__ == '__main__':
 
     print("#"*20 + " Results...")
 
-
     import evo
     from evo.core.trajectory import PoseTrajectory3D
     from evo.tools import file_interface
@@ -102,11 +102,9 @@ if __name__ == '__main__':
     import evo.main_ape as main_ape
     from evo.core.metrics import PoseRelation
 
-
     image_path = os.path.join(args.datapath, 'rgb')
     images_list = sorted(glob.glob(os.path.join(image_path, '*.png')))[::2]
     tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
-
 
     traj_est = PoseTrajectory3D(
         positions_xyz=traj_est[:,:3],

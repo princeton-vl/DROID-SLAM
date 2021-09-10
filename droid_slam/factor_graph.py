@@ -109,8 +109,9 @@ class FactorGraph:
 
         # correlation volume for new edges
         if self.corr_impl == "volume":
-            fmap1 = self.video.fmaps[ii].to(self.device).unsqueeze(0)
-            fmap2 = self.video.fmaps[jj].to(self.device).unsqueeze(0)
+            c = (ii == jj).long()
+            fmap1 = self.video.fmaps[ii,0].to(self.device).unsqueeze(0)
+            fmap2 = self.video.fmaps[jj,c].to(self.device).unsqueeze(0)
             corr = CorrBlock(fmap1, fmap2)
             self.corr = corr if self.corr is None else self.corr.cat(corr)
 
@@ -167,20 +168,27 @@ class FactorGraph:
         with self.video.get_lock():
             self.video.poses[ix] = self.video.poses[ix+1]
             self.video.disps[ix] = self.video.disps[ix+1]
+            self.video.disps_sens[ix] = self.video.disps_sens[ix+1]
             self.video.intrinsics[ix] = self.video.intrinsics[ix+1]
 
             self.video.nets[ix] = self.video.nets[ix+1]
             self.video.inps[ix] = self.video.inps[ix+1]
             self.video.fmaps[ix] = self.video.fmaps[ix+1]
 
+        m = (self.ii_inac == ix) | (self.jj_inac == ix)
+        self.ii_inac[self.ii_inac >= ix] -= 1
+        self.jj_inac[self.jj_inac >= ix] -= 1
+
+        if torch.any(m):
+            self.ii_inac = self.ii_inac[~m]
+            self.jj_inac = self.jj_inac[~m]
+            self.target_inac = self.target_inac[:,~m]
+            self.weight_inac = self.weight_inac[:,~m]
+
         m = (self.ii == ix) | (self.jj == ix)
 
         self.ii[self.ii >= ix] -= 1
         self.jj[self.jj >= ix] -= 1
-
-        self.ii_inac[self.ii_inac >= ix] -= 1
-        self.jj_inac[self.jj_inac >= ix] -= 1
-
         self.rm_factors(m, store=False)
 
 
@@ -239,7 +247,9 @@ class FactorGraph:
 
         # alternate corr implementation
         t = self.video.counter.value
-        corr_op = AltCorrBlock(self.video.fmaps[None,:t])
+
+        num, rig, ch, ht, wd = self.video.fmaps.shape
+        corr_op = AltCorrBlock(self.video.fmaps.view(1, num*rig, ch, ht, wd))
 
         for step in range(steps):
             print("Global BA Iteration #{}".format(step+1))
@@ -253,11 +263,12 @@ class FactorGraph:
                 v = (self.ii >= i) & (self.ii < i + s)
                 iis = self.ii[v]
                 jjs = self.jj[v]
-                
-                ht, wd = self.coords0.shape[0:2]
-                corr1 = corr_op(coords1[:,v], iis, jjs)
 
-                with torch.cuda.amp.autocast(enabled=True):                        
+                ht, wd = self.coords0.shape[0:2]
+                corr1 = corr_op(coords1[:,v], rig * iis, rig * jjs + (iis == jjs).long())
+
+                with torch.cuda.amp.autocast(enabled=True):
+                 
                     net, delta, weight, damping, _ = \
                         self.update_op(self.net[:,v], self.video.inps[None,iis], corr1, motn[:,v], iis, jjs)
 
@@ -267,7 +278,7 @@ class FactorGraph:
                 self.weight[:,v] = weight.float()
                 self.damping[torch.unique(iis)] = damping
 
-            damping = self.damping[torch.unique(self.ii)].contiguous() + EP
+            damping = .2 * self.damping[torch.unique(self.ii)].contiguous() + EP
             target = self.target.view(-1, ht, wd, 2).permute(0,3,1,2).contiguous()
             weight = self.weight.view(-1, ht, wd, 2).permute(0,3,1,2).contiguous()
 
@@ -277,7 +288,6 @@ class FactorGraph:
 
             self.video.dirty[:t] = True
 
-
     def add_neighborhood_factors(self, t0, t1, r=3):
         """ add edges between neighboring frames within radius r """
 
@@ -285,7 +295,9 @@ class FactorGraph:
         ii = ii.reshape(-1).to(dtype=torch.long, device=self.device)
         jj = jj.reshape(-1).to(dtype=torch.long, device=self.device)
 
-        keep = ((ii - jj).abs() > 0) & ((ii - jj).abs() <= r)
+        c = 1 if self.video.stereo else 0
+
+        keep = ((ii - jj).abs() > c) & ((ii - jj).abs() <= r)
         self.add_factors(ii[keep], jj[keep])
 
     
@@ -307,8 +319,6 @@ class FactorGraph:
         ii1 = torch.cat([self.ii, self.ii_bad, self.ii_inac], 0)
         jj1 = torch.cat([self.jj, self.jj_bad, self.jj_inac], 0)
         for i, j in zip(ii1.cpu().numpy(), jj1.cpu().numpy()):
-            if abs(i - j) <= 2:
-                continue
             for di in range(-nms, nms+1):
                 for dj in range(-nms, nms+1):
                     if abs(di) + abs(dj) <= max(min(abs(i-j)-2, nms), 0):
@@ -318,16 +328,25 @@ class FactorGraph:
                         if (t0 <= i1 < t) and (t1 <= j1 < t):
                             d[(i1-t0)*(t-t1) + (j1-t1)] = np.inf
 
+
         es = []
         for i in range(t0, t):
-            for j in range(i+1, min(i+rad+1, t)):
+            if self.video.stereo:
+                es.append((i, i))
+                d[(i-t0)*(t-t1) + (i-t1)] = np.inf
+
+            for j in range(max(i-rad-1,0), i):
                 es.append((i,j))
                 es.append((j,i))
+                d[(i-t0)*(t-t1) + (j-t1)] = np.inf
 
         ix = torch.argsort(d)
         for k in ix:
             if d[k].item() > thresh:
                 continue
+
+            if len(es) > self.max_factors:
+                break
 
             i = ii[k]
             j = jj[k]

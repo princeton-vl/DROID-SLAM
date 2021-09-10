@@ -43,6 +43,7 @@ std::vector<torch::Tensor> ba_cuda(
     torch::Tensor poses,
     torch::Tensor disps,
     torch::Tensor intrinsics,
+    torch::Tensor disps_sens,
     torch::Tensor targets,
     torch::Tensor weights,
     torch::Tensor eta,
@@ -88,6 +89,7 @@ std::vector<torch::Tensor> ba(
     torch::Tensor poses,
     torch::Tensor disps,
     torch::Tensor intrinsics,
+    torch::Tensor disps_sens,
     torch::Tensor targets,
     torch::Tensor weights,
     torch::Tensor eta,
@@ -105,10 +107,11 @@ std::vector<torch::Tensor> ba(
   CHECK_INPUT(poses);
   CHECK_INPUT(disps);
   CHECK_INPUT(intrinsics);
+  CHECK_INPUT(disps_sens);
   CHECK_INPUT(ii);
   CHECK_INPUT(jj);
 
-  return ba_cuda(poses, disps, intrinsics, targets, weights,
+  return ba_cuda(poses, disps, intrinsics, disps_sens, targets, weights,
                  eta, ii, jj, t0, t1, iterations, lm, ep, motion_only);
 
 }

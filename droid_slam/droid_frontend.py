@@ -44,6 +44,9 @@ class DroidFrontend:
         self.graph.add_proximity_factors(self.t1-5, max(self.t1-self.frontend_window, 0), 
             rad=self.frontend_radius, nms=self.frontend_nms, thresh=self.frontend_thresh, beta=self.beta, remove=True)
 
+        self.video.disps[self.t1-1] = torch.where(self.video.disps_sens[self.t1-1] > 0, 
+           self.video.disps_sens[self.t1-1], self.video.disps[self.t1-1])
+
         for itr in range(self.iters1):
             self.graph.update(None, None, use_inactive=True)
 
@@ -80,10 +83,11 @@ class DroidFrontend:
         for itr in range(8):
             self.graph.update(1, use_inactive=True)
 
-        self.graph.add_proximity_factors(0, 0, rad=2, nms=2, thresh=self.frontend_thresh)
+        self.graph.add_proximity_factors(0, 0, rad=2, nms=2, thresh=self.frontend_thresh, remove=False)
 
-        for itr in range(12):
+        for itr in range(8):
             self.graph.update(1, use_inactive=True)
+
 
         # self.video.normalize()
         self.video.poses[self.t1] = self.video.poses[self.t1-1].clone()
@@ -98,6 +102,8 @@ class DroidFrontend:
         with self.video.get_lock():
             self.video.ready.value = 1
             self.video.dirty[:self.t1] = True
+
+        self.graph.rm_factors(self.graph.ii < self.warmup-4, store=True)
 
     def __call__(self):
         """ main update """

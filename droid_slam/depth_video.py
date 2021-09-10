@@ -10,7 +10,7 @@ from droid_net import cvx_upsample
 import geom.projective_ops as pops
 
 class DepthVideo:
-    def __init__(self, image_size=[480, 640], buffer=1024, device="cuda:0"):
+    def __init__(self, image_size=[480, 640], buffer=1024, stereo=False, device="cuda:0"):
                 
         # current keyframe count
         self.counter = Value('i', 0)
@@ -25,11 +25,15 @@ class DepthVideo:
         self.red = torch.zeros(buffer, device="cuda", dtype=torch.bool).share_memory_()
         self.poses = torch.zeros(buffer, 7, device="cuda", dtype=torch.float).share_memory_()
         self.disps = torch.ones(buffer, ht//8, wd//8, device="cuda", dtype=torch.float).share_memory_()
+        self.disps_sens = torch.zeros(buffer, ht//8, wd//8, device="cuda", dtype=torch.float).share_memory_()
         self.disps_up = torch.zeros(buffer, ht, wd, device="cuda", dtype=torch.float).share_memory_()
         self.intrinsics = torch.zeros(buffer, 4, device="cuda", dtype=torch.float).share_memory_()
 
+        self.stereo = stereo
+        c = 1 if not self.stereo else 2
+
         ### feature attributes ###
-        self.fmaps = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
+        self.fmaps = torch.zeros(buffer, c, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
         self.nets = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
         self.inps = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
 
@@ -57,16 +61,20 @@ class DepthVideo:
             self.disps[index] = item[3]
 
         if item[4] is not None:
-            self.intrinsics[index] = item[4]
+            depth = item[4][3::8,3::8]
+            self.disps_sens[index] = torch.where(depth>0, 1.0/depth, depth)
 
-        if len(item) > 5:
-            self.fmaps[index] = item[5]
+        if item[5] is not None:
+            self.intrinsics[index] = item[5]
 
         if len(item) > 6:
-            self.nets[index] = item[6]
+            self.fmaps[index] = item[6]
 
         if len(item) > 7:
-            self.inps[index] = item[7]
+            self.nets[index] = item[7]
+
+        if len(item) > 8:
+            self.inps[index] = item[8]
 
     def __setitem__(self, index, item):
         with self.get_lock():
@@ -179,11 +187,7 @@ class DepthVideo:
             if t1 is None:
                 t1 = max(ii.max().item(), jj.max().item()) + 1
 
-            if eta is None:
-                k = torch.unique(torch.cat([ii, jj], 0)).shape[0]
-                eta = 1e-7 * torch.ones([k, self.ht//8, self.wd//8], device="cuda")
-
-            droid_backends.ba(self.poses, self.disps, self.intrinsics[0], 
+            droid_backends.ba(self.poses, self.disps, self.intrinsics[0], self.disps_sens,
                 target, weight, eta, ii, jj, t0, t1, itrs, lm, ep, motion_only)
 
             self.disps.clamp_(min=0.001)

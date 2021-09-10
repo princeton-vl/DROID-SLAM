@@ -15,7 +15,7 @@ Zachary Teed and Jia Deng
 }
 ```
 
-**Initial Code Release:** This repo currently provides a single GPU implementation of our monocular SLAM system. It also contains demos, training, and evaluation scripts. Stereo, RGB-D, and multi-GPU code will be added on **September 7**.
+**Initial Code Release:** This repo currently provides a single GPU implementation of our monocular SLAM system. It currently contains demos, training, and evaluation scripts. 
 
 
 ## Requirements
@@ -83,25 +83,33 @@ fx fy cx cy [k1 k2 p1 p2 [ k3 [ k4 k5 k6 ]]]
 ```
 with parameters in brackets optional.
 
-## Evaluation (Monocular)
-We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir validation script will require 24G of memory.
+## Evaluation
+We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir and ETH will require 24G of memory.
 
-### EuRoC
-Download the [EuRoC](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) sequences (ASL format) and put them in `datasets/EuRoC`
-```Bash
-./tools/evaluate_euroc.sh
-```
-
-### TUM-RGBD
-Download the fr1 sequences from [TUM-RGBD](https://vision.in.tum.de/data/datasets/rgbd-dataset/download) and put them in `datasets/TUM-RGBD`
-```Bash
-./tools/evaluate_tum.sh 
-```
-
-### TartanAir
+### TartanAir (Mono + Stereo)
 Download the [TartanAir](https://theairlab.org/tartanair-dataset/) dataset using the script `thirdparty/tartanair_tools/download_training.py` and put them in `datasets/TartanAir`
 ```Bash
-./tools/validate_tartanair.sh
+./tools/validate_tartanair.sh --plot_curve            # monocular eval
+./tools/validate_tartanair.sh --plot_curve  --stereo  # stereo eval
+```
+
+### EuRoC (Mono + Stereo)
+Download the [EuRoC](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) sequences (ASL format) and put them in `datasets/EuRoC`
+```Bash
+./tools/evaluate_euroc.sh                             # monocular eval
+./tools/evaluate_euroc.sh --stereo                    # stereo eval
+```
+
+### TUM-RGBD (Mono)
+Download the fr1 sequences from [TUM-RGBD](https://vision.in.tum.de/data/datasets/rgbd-dataset/download) and put them in `datasets/TUM-RGBD`
+```Bash
+./tools/evaluate_tum.sh                               # monocular eval
+```
+
+### ETH3D (RGB-D)
+Download the [ETH3D](https://www.eth3d.net/slam_datasets) dataset
+```Bash
+./tools/evaluate_eth3d.sh                             # RGB-D eval
 ```
 
 ## Training

@@ -16,6 +16,6 @@ evalset=(
 )
 
 for seq in ${evalset[@]}; do
-    python evaluation_scripts/test_tum.py --datapath=$TUM_PATH/$seq --weights=droid.pth --disable_vis
+    python evaluation_scripts/test_tum.py --datapath=$TUM_PATH/$seq --weights=droid.pth --disable_vis $@
 done
 

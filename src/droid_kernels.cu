@@ -149,9 +149,8 @@ expSE3(const float *xi, float* t, float* q) {
   // SE3 exponential map
 
   expSO3(xi + 3, q);
-
   float tau[3] = {xi[0], xi[1], xi[2]};
-  float phi[3] = {xi[3], xi[4], xi[45]};
+  float phi[3] = {xi[3], xi[4], xi[5]};
 
   float theta_sq = phi[0]*phi[0] + phi[1]*phi[1] + phi[2]*phi[2];
   float theta = sqrtf(theta_sq);
@@ -195,8 +194,8 @@ __global__ void projective_transform_kernel(
   const int ht = disps.size(1);
   const int wd = disps.size(2);
 
-  __shared__ int ix;
-  __shared__ int jx;
+  int ix = static_cast<int>(ii[block_id]);
+  int jx = static_cast<int>(jj[block_id]);
 
   __shared__ float fx;
   __shared__ float fy;
@@ -208,8 +207,6 @@ __global__ void projective_transform_kernel(
 
   // load intrinsics from global memory
   if (thread_id == 0) {
-    ix = static_cast<int>(ii[block_id]);
-    jx = static_cast<int>(jj[block_id]);
     fx = intrinsics[0];
     fy = intrinsics[1];
     cx = intrinsics[2];
@@ -218,22 +215,40 @@ __global__ void projective_transform_kernel(
 
   __syncthreads();
 
-  // load poses from global memory
-  if (thread_id < 3) {
-    ti[thread_id] = poses[ix][thread_id];
-    tj[thread_id] = poses[jx][thread_id];
+  // stereo frames
+  if (ix == jx) {
+    if (thread_id == 0) {
+      tij[0] =  -0.1;
+      tij[1] =     0;
+      tij[2] =     0;
+      qij[0] =     0;
+      qij[1] =     0;
+      qij[2] =     0;
+      qij[3] =     1;
+    }
   }
 
-  if (thread_id < 4) {
-    qi[thread_id] = poses[ix][thread_id+3];
-    qj[thread_id] = poses[jx][thread_id+3];
+  else {
+
+    // load poses from global memory
+    if (thread_id < 3) {
+      ti[thread_id] = poses[ix][thread_id];
+      tj[thread_id] = poses[jx][thread_id];
+    }
+
+    if (thread_id < 4) {
+      qi[thread_id] = poses[ix][thread_id+3];
+      qj[thread_id] = poses[jx][thread_id+3];
+    }
+
+    __syncthreads();
+
+    if (thread_id == 0) {
+      relSE3(ti, qi, tj, qj, tij, qij);
+    }
   }
 
   __syncthreads();
-
-  if (thread_id == 0) {
-    relSE3(ti, qi, tj, qj, tij, qij);
-  }
 
   //points 
   float Xi[4];
@@ -287,9 +302,8 @@ __global__ void projective_transform_kernel(
     const float d = (Xj[2] < MIN_DEPTH) ? 0.0 : 1.0 / Xj[2];
     const float d2 = d * d;
 
-    const float wu = (Xj[2] < MIN_DEPTH) ? 0.0 : .001 * weight[block_id][0][i][j];
-    const float wv = (Xj[2] < MIN_DEPTH) ? 0.0 : .001 * weight[block_id][1][i][j];
-
+    float wu = (Xj[2] < MIN_DEPTH) ? 0.0 : .001 * weight[block_id][0][i][j];
+    float wv = (Xj[2] < MIN_DEPTH) ? 0.0 : .001 * weight[block_id][1][i][j];
     const float ru = target[block_id][0][i][j] - (fx * d * x + cx);
     const float rv = target[block_id][1][i][j] - (fy * d * y + cy);
 
@@ -303,6 +317,11 @@ __global__ void projective_transform_kernel(
     Jj[5] = fx * (-y*d);
 
     Jz = fx * (tij[0] * d - tij[2] * (x * d2));
+    Cii[block_id][k] = wu * Jz * Jz;
+    bz[block_id][k] = wu * ru * Jz;
+
+    if (ix == jx) wu = 0;
+
     adjSE3(tij, qij, Jj, Ji);
     for (int n=0; n<6; n++) Ji[n] *= -1;
 
@@ -322,8 +341,6 @@ __global__ void projective_transform_kernel(
       Eij[block_id][n][k] = wu * Jz * Jj[n];
     }
 
-    Cii[block_id][k] = wu * Jz * Jz;
-    bz[block_id][k] = wu * ru * Jz;
 
     Jj[0] = fy * 0;
     Jj[1] = fy * (h*d);
@@ -333,6 +350,11 @@ __global__ void projective_transform_kernel(
     Jj[5] = fy * (x*d);
 
     Jz = fy * (tij[1] * d - tij[2] * (y * d2));
+    Cii[block_id][k] += wv * Jz * Jz;
+    bz[block_id][k] += wv * rv * Jz;
+
+    if (ix == jx) wv = 0;
+
     adjSE3(tij, qij, Jj, Ji);
     for (int n=0; n<6; n++) Ji[n] *= -1;
 
@@ -352,8 +374,7 @@ __global__ void projective_transform_kernel(
       Eij[block_id][n][k] += wv * Jz * Jj[n];
     }
 
-    Cii[block_id][k] += wv * Jz * Jz;
-    bz[block_id][k] += wv * rv * Jz;
+
   }
 
   __syncthreads();
@@ -1294,6 +1315,7 @@ std::vector<torch::Tensor> ba_cuda(
     torch::Tensor poses,
     torch::Tensor disps,
     torch::Tensor intrinsics,
+    torch::Tensor disps_sens,
     torch::Tensor targets,
     torch::Tensor weights,
     torch::Tensor eta,
@@ -1370,10 +1392,12 @@ std::vector<torch::Tensor> ba_cuda(
     }
     
     else {
-
-      torch::Tensor C = accum_cuda(Cii, ii, kx);
-      torch::Tensor w = accum_cuda(wi, ii, kx);
-      torch::Tensor Q = 1.0 / (C + eta.view({-1, ht*wd}));
+      // add depth residual if there are depth sensor measurements
+      const float alpha = 0.05;
+      torch::Tensor m = (disps_sens.index({kx, "..."}) > 0).to(torch::TensorOptions().dtype(torch::kFloat32)).view({-1, ht*wd});
+      torch::Tensor C = accum_cuda(Cii, ii, kx) + m * alpha + (1 - m) * eta.view({-1, ht*wd});
+      torch::Tensor w = accum_cuda(wi, ii, kx) - m * alpha * (disps.index({kx, "..."}) - disps_sens.index({kx, "..."})).view({-1, ht*wd});
+      torch::Tensor Q = 1.0 / C;
 
       torch::Tensor Ei = accum_cuda(Eii.view({num, 6*ht*wd}), ii, ts).view({t1-t0, 6, ht*wd});
       torch::Tensor E = torch::cat({Ei, Eij}, 0);
@@ -1515,4 +1539,3 @@ torch::Tensor iproj_cuda(
   return points;
 
 }
-
