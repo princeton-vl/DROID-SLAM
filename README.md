@@ -33,7 +33,7 @@ git clone --recursive https://github.com/princeton-vl/DROID-SLAM.git
 
 2. Creating a new anaconda environment using the provided .yaml file. Use `environment_novis.yaml` to if you do not want to use the visualization
 ```Bash
-conda env create -f environment.yml
+conda env create -f environment.yaml
 pip install evo --upgrade --no-binary evo
 pip install gdown
 ```
