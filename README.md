@@ -4,7 +4,7 @@
 <!-- <center><img src="misc/DROID.png" width="640" style="center"></center> -->
 
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/GG78CSlSHSA/0.jpg)](https://www.youtube.com/watch?v=GG78CSlSHSA)
+[![IMAGE ALT TEXT HERE](misc/screenshot.png)](https://www.youtube.com/watch?v=GG78CSlSHSA)
 
 
 
