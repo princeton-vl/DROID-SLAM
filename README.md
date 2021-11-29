@@ -1,7 +1,12 @@
 # DROID-SLAM
 
 
-<center><img src="misc/DROID.png" width="640" style="center"></center>
+<!-- <center><img src="misc/DROID.png" width="640" style="center"></center> -->
+
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/GG78CSlSHSA/0.jpg)](https://www.youtube.com/watch?v=GG78CSlSHSA)
+
+
 
 [DROID-SLAM: Deep Visual SLAM for Monocular, Stereo, and RGB-D Cameras](https://arxiv.org/abs/2108.10869)  
 Zachary Teed and Jia Deng
@@ -10,7 +15,7 @@ Zachary Teed and Jia Deng
 @article{teed2021droid,
   title={{DROID-SLAM: Deep Visual SLAM for Monocular, Stereo, and RGB-D Cameras}},
   author={Teed, Zachary and Deng, Jia},
-  journal={arXiv preprint arXiv:2108.10869},
+  journal={Advances in neural information processing systems},
   year={2021}
 }
 ```
@@ -33,7 +38,7 @@ git clone --recursive https://github.com/princeton-vl/DROID-SLAM.git
 
 2. Creating a new anaconda environment using the provided .yaml file. Use `environment_novis.yaml` to if you do not want to use the visualization
 ```Bash
-conda env create -f environment.yml
+conda env create -f environment.yaml
 pip install evo --upgrade --no-binary evo
 pip install gdown
 ```
