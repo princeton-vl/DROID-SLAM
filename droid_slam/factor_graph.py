@@ -9,12 +9,13 @@ import geom.projective_ops as pops
 
 
 class FactorGraph:
-    def __init__(self, video, update_op, device="cuda:0", corr_impl="volume", max_factors=-1):
+    def __init__(self, video, update_op, device="cuda:0", corr_impl="volume", max_factors=-1, upsample=False):
         self.video = video
         self.update_op = update_op
         self.device = device
         self.max_factors = max_factors
         self.corr_impl = corr_impl
+        self.upsample = upsample
 
         # operator at 1/8 resolution
         self.ht = ht = video.ht // 8
@@ -239,6 +240,9 @@ class FactorGraph:
             self.video.ba(target, weight, damping, ii, jj, t0, t1, 
                 itrs=itrs, lm=1e-4, ep=0.1, motion_only=motion_only)
         
+            if self.upsample:
+                self.video.upsample(torch.unique(self.ii), upmask)
+
         self.age += 1
 
 
@@ -270,9 +274,11 @@ class FactorGraph:
 
                 with torch.cuda.amp.autocast(enabled=True):
                  
-                    net, delta, weight, damping, _ = \
+                    net, delta, weight, damping, upmask = \
                         self.update_op(self.net[:,v], self.video.inps[None,iis], corr1, motn[:,v], iis, jjs)
 
+                    if self.upsample:
+                        self.video.upsample(torch.unique(iis), upmask)
 
                 self.net[:,v] = net
                 self.target[:,v] = coords1[:,v] + delta.float()

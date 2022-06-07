@@ -1,4 +1,4 @@
-name: droidenv5
+name: droidenv
 channels:
   - rusty1s
   - pytorch

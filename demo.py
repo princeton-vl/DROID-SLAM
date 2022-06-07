@@ -56,6 +56,27 @@ def image_stream(imagedir, calib, stride):
         yield t, image[None], intrinsics
 
 
+def save_reconstruction(droid, reconstruction_path):
+
+    from pathlib import Path
+    import random
+    import string
+
+    t = droid.video.counter.value
+    tstamps = droid.video.tstamp[:t].cpu().numpy()
+    images = droid.video.images[:t].cpu().numpy()
+    disps = droid.video.disps_up[:t].cpu().numpy()
+    poses = droid.video.poses[:t].cpu().numpy()
+    intrinsics = droid.video.intrinsics[:t].cpu().numpy()
+
+    Path("reconstructions/{}".format(reconstruction_path)).mkdir(parents=True, exist_ok=True)
+    np.save("reconstructions/{}/tstamps.npy".format(reconstruction_path), tstamps)
+    np.save("reconstructions/{}/images.npy".format(reconstruction_path), images)
+    np.save("reconstructions/{}/disps.npy".format(reconstruction_path), disps)
+    np.save("reconstructions/{}/poses.npy".format(reconstruction_path), poses)
+    np.save("reconstructions/{}/intrinsics.npy".format(reconstruction_path), intrinsics)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--imagedir", type=str, help="path to image directory")
@@ -80,12 +101,18 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=22.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=3)
+    parser.add_argument("--upsample", action="store_true")
+    parser.add_argument("--reconstruction_path", help="path to saved reconstruction")
     args = parser.parse_args()
 
     args.stereo = False
     torch.multiprocessing.set_start_method('spawn')
 
     droid = None
+
+    # need high resolution depths
+    if args.reconstruction_path is not None:
+        args.upsample = True
 
     tstamps = []
     for (t, image, intrinsics) in tqdm(image_stream(args.imagedir, args.calib, args.stride)):
@@ -100,5 +127,8 @@ if __name__ == '__main__':
             droid = Droid(args)
         
         droid.track(t, image, intrinsics=intrinsics)
+
+    if args.reconstruction_path is not None:
+        save_reconstruction(droid, args.reconstruction_path)
 
     traj_est = droid.terminate(image_stream(args.imagedir, args.calib, args.stride))

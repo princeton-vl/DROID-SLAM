@@ -15,6 +15,7 @@ class DroidBackend:
         self.t0 = 0
         self.t1 = 0
 
+        self.upsample = args.upsample
         self.beta = args.beta
         self.backend_thresh = args.backend_thresh
         self.backend_radius = args.backend_radius
@@ -28,7 +29,7 @@ class DroidBackend:
         if not self.video.stereo and not torch.any(self.video.disps_sens):
              self.video.normalize()
 
-        graph = FactorGraph(self.video, self.update_op, corr_impl="alt", max_factors=16*t)
+        graph = FactorGraph(self.video, self.update_op, corr_impl="alt", max_factors=16*t, upsample=self.upsample)
 
         graph.add_proximity_factors(rad=self.backend_radius, 
                                     nms=self.backend_nms, 
