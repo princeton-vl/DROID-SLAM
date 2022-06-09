@@ -88,6 +88,7 @@ if __name__ == '__main__':
     parser.add_argument("--buffer", type=int, default=512)
     parser.add_argument("--image_size", default=[240, 320])
     parser.add_argument("--disable_vis", action="store_true")
+    parser.add_argument("--save_path", type=bool, help="save optimized path in current directory")
 
     parser.add_argument("--beta", type=float, default=0.3, help="weight for translation / rotation components of flow")
     parser.add_argument("--filter_thresh", type=float, default=2.4, help="how much motion before considering new keyframe")
@@ -116,6 +117,8 @@ if __name__ == '__main__':
 
     tstamps = []
     for (t, image, intrinsics) in tqdm(image_stream(args.imagedir, args.calib, args.stride)):
+        tstamps.append(t)
+        
         if t < args.t0:
             continue
 
@@ -132,3 +135,7 @@ if __name__ == '__main__':
         save_reconstruction(droid, args.reconstruction_path)
 
     traj_est = droid.terminate(image_stream(args.imagedir, args.calib, args.stride))
+    
+    if(args.save_path):
+        tstamps = np.array(tstamps)
+        np.savetxt("results.txt", np.column_stack((tstamps, traj_est)))   
