@@ -176,6 +176,7 @@ class FactorGraph:
             self.video.nets[ix] = self.video.nets[ix+1]
             self.video.inps[ix] = self.video.inps[ix+1]
             self.video.fmaps[ix] = self.video.fmaps[ix+1]
+            self.video.tstamps[ix] = self.video.tstamp[ix+1]
 
         m = (self.ii_inac == ix) | (self.jj_inac == ix)
         self.ii_inac[self.ii_inac >= ix] -= 1
