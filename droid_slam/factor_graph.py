@@ -328,7 +328,7 @@ class FactorGraph:
         for i, j in zip(ii1.cpu().numpy(), jj1.cpu().numpy()):
             for di in range(-nms, nms+1):
                 for dj in range(-nms, nms+1):
-                    if abs(di) + abs(dj) <= max(min(abs(i-j)-2, nms), 0):
+                    if abs(di) + abs(dj) <= max(min(abs(i-j)-nms, nms), 0):
                         i1 = i + di
                         j1 = j + dj
 
@@ -364,7 +364,7 @@ class FactorGraph:
 
             for di in range(-nms, nms+1):
                 for dj in range(-nms, nms+1):
-                    if abs(di) + abs(dj) <= max(min(abs(i-j)-2, nms), 0):
+                    if abs(di) + abs(dj) <= max(min(abs(i-j)-nms, nms), 0):
                         i1 = i + di
                         j1 = j + dj
 
