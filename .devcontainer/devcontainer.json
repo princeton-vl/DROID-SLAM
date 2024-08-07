@@ -1,0 +1,32 @@
+{
+  "name": "DROID-SLAM",
+  "build": {
+    "dockerfile": "dockerfile",
+    "context": ".." // Only when inside .devcontainer
+  },
+  //"dockerComposeFile": "docker-compose.yml",
+  //"service": "container",
+  // "overrideCommand": true,
+  // "initializeCommand": [
+  //   ".devcontainer/initialize_command"
+  // ],
+  //"workspaceFolder": "/workspace",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/vscode/.bash_history,type=bind",
+    "source=/data_storage/tum-datasets,target=/workspaces/DROID-SLAM/data,type=bind",
+    "source=/data_storage/droid-slam,target=/workspaces/DROID-SLAM/output,type=bind"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/conda:1": {}
+  },
+  "runArgs": [
+    "--gpus",
+    "all",
+    "--env",
+    "DISPLAY=${localEnv:DISPLAY}",
+    "--volume",
+    "/tmp/.X11-unix:/tmp/.X11-unix",
+    "--privileged"
+  ],
+  "postCreateCommand": "bash -i .devcontainer/post_install_script.sh"
+}

@@ -135,7 +135,7 @@ def droid_visualization(video, device="cuda:0"):
 
             # hack to allow interacting with vizualization during inference
             if len(droid_visualization.cameras) >= droid_visualization.warmup:
-                cam = vis.get_view_control().convert_from_pinhole_camera_parameters(cam)
+                cam = vis.get_view_control().convert_from_pinhole_camera_parameters(cam, True)
 
             droid_visualization.ix += 1
             vis.poll_events()

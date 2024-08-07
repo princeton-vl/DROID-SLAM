@@ -1,0 +1,24 @@
+services:
+  container:
+    stdin_open: true
+    tty: true
+    build:
+      context: ..
+      dockerfile: .devcontainer/dockerfile
+    volumes:
+      - type: bind
+        source: ..
+        target: /workspace
+      - type: bind
+        source: /data_storage/tum-datasets
+        target: /workspace/data
+      - type: bind
+        source: /data_storage/droid-slam
+        target: /workspace/output
+    network_mode: "host"
+    privileged: true
+    environment:
+      - DISPLAY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_REQUIRE_CUDA=cuda>=11.1

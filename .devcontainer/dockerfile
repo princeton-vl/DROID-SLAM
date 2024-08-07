@@ -1,0 +1,91 @@
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+# Metadata
+LABEL maintainer="rajahaseeb147@gmail.com" \
+    project-name="Droid-SLAM" \
+    com.droid-slam.version="0.0.1-alpha" \
+    com.droid-slam.realease-data="2023.01.20"
+
+# Create a new user and set the password
+ARG USERNAME=developer 
+ARG USER_UID=1000 
+ARG USER_GID=$USER_UID 
+ARG PASSWORD=dev 
+RUN apt-get update && apt-get install -y sudo && \
+    groupadd --gid $USER_GID $USERNAME && \
+    useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME && \
+    echo "$USERNAME:$PASSWORD" | chpasswd && \
+    usermod -aG sudo $USERNAME && \
+    echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME && \
+    chmod 0440 /etc/sudoers.d/$USERNAME 
+
+# Ensure sudoers file is read-only  
+RUN chmod 0440 /etc/sudoers.d/$USERNAME 
+USER $USERNAME
+
+# Set arguments and env variables
+ARG DEBIAN_FRONTEND=noninteractive
+
+# ENV NVIDIA_VISIBLE_DEVICES all
+# ENV NVIDIA_DRIVER_CAPABILITIES graphics,utility,compute
+
+
+# Fetch nvidia signing keys
+RUN sudo apt-key del 7fa2af80
+RUN sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/3bf863cc.pub
+
+# Install ubuntu base packages
+RUN sudo apt-get update && sudo apt install -y --no-install-recommends \
+    software-properties-common \
+    apt-utils \
+    dbus-x11 \
+    libglvnd0 \
+    libgl1 \
+    libglx0 \
+    libegl1 \
+    libxext6 \
+    libx11-6 \
+    libgl1-mesa-dev \
+    libglew-dev 
+
+
+RUN sudo apt-get update && sudo apt install -y --no-install-recommends \
+    build-essential \
+    libboost-all-dev \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    ninja-build
+
+# Installing required utilities
+RUN sudo apt-get update && sudo apt-get install -y \
+    curl \
+    git \
+    ssh \
+    unzip \
+    vim \
+    wget \
+    && sudo apt-get clean \
+    && sudo rm -rf /var/lib/apt/lists/*
+
+# Install miniconda (https://fabiorosado.dev/blog/install-conda-in-docker/)
+ENV CONDA_DIR /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh && \
+    sudo /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh
+
+# Put conda in path so we can use conda activate
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+# Initialize conda
+RUN conda init bash
+
+# Install Droid SLAM dependencies
+COPY environment.yaml environment.yaml
+RUN conda env create -f environment.yaml && \
+    sudo rm environment.yaml
+
+# Activate conda everytime, when (re)opening bash terminal
+RUN sudo echo ". activate droidenv" > ~/.bashrc
+
+# Set entry commands
+ENTRYPOINT ["/bin/bash"]
