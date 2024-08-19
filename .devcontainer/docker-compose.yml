@@ -1,24 +1,30 @@
 services:
   container:
-    stdin_open: true
-    tty: true
     build:
       context: ..
       dockerfile: .devcontainer/dockerfile
     volumes:
       - type: bind
         source: ..
-        target: /workspace
+        target: /workspace/droid-slam
       - type: bind
-        source: /data_storage/tum-datasets
-        target: /workspace/data
+        source: ${SELECTED_DIRECTORY}
+        target: /workspace/mounted_directory
       - type: bind
-        source: /data_storage/droid-slam
-        target: /workspace/output
+        source: /tmp/.X11-unix
+        target: /tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+      - PULSE_SERVER=${PULSE_SERVER}
     network_mode: "host"
     privileged: true
-    environment:
-      - DISPLAY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_REQUIRE_CUDA=cuda>=11.1
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

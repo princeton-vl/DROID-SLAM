@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# Disable access control so any client can connect to the x-server.
+if [[ -x "$(command -v xhost)" ]]; then
+  echo Disabling access control for X-server.
+  xhost + > /dev/null
+fi
+
+ENVIRONMENT_FILE=".devcontainer/.env"
+ENVIRONMENT_VARIABLE="SELECTED_DIRECTORY"
+
+echo Set up a directory to be mounted inside the dev container.
+echo Note that if you change the directory to be mounted, you will need to rebuild the container for the changes to take effect.
+
+if [[ -f "${ENVIRONMENT_FILE}" ]]; then
+  source "${ENVIRONMENT_FILE}"
+
+  if [[ ! -z "${ENVIRONMENT_VARIABLE}" ]]; then
+    MESSAGE="The directory '${!ENVIRONMENT_VARIABLE}' has previously been selected for mounting. Would you like to choose a different directory? [y/N] "
+    read -p "${MESSAGE}" confirm && [[ $confirm == y ]] || exit 0
+  fi
+fi
+
+# Allow the developer to choose a directory of their choice to mount.
+read -p "Enter a directory to mount: " SELECTED_DIRECTORY
+
+# Check if the user canceled directory selection.
+if [[ -z "${SELECTED_DIRECTORY}" ]]; then
+  echo Error: Directory selection canceled.
+  exit 1
+fi
+
+# Check if the provided directory exists.
+if [[ ! -d "${SELECTED_DIRECTORY}" ]]; then
+  echo Error: The directory does not exist.
+  exit 1
+fi
+
+# Save the selected directory in an environment variable. This will later be leveraged
+# by the docker-compose.yml to mount the specified directory inside the container.
+echo "${ENVIRONMENT_VARIABLE}=${SELECTED_DIRECTORY}" > "${ENVIRONMENT_FILE}"
