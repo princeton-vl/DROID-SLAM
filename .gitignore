@@ -154,5 +154,5 @@ cache
 *.o
 data
 figures/*.pdf
-
-
+reconstructions/
+.idea/

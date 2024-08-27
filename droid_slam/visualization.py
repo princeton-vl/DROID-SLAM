@@ -6,6 +6,7 @@ import time
 import argparse
 import numpy as np
 import open3d as o3d
+from pathlib import Path
 
 from lietorch import SE3
 import geom.projective_ops as pops
@@ -50,7 +51,7 @@ def create_point_actor(points, colors):
     point_cloud.colors = o3d.utility.Vector3dVector(colors)
     return point_cloud
 
-def droid_visualization(video, device="cuda:0"):
+def droid_visualization(video, save_path, device="cuda:0"):
     """ DROID visualization frontend """
 
     torch.cuda.set_device(device)
@@ -151,4 +152,21 @@ def droid_visualization(video, device="cuda:0"):
     vis.get_render_option().load_from_json("misc/renderoption.json")
 
     vis.run()
+
+    # Hack to save Point Cloud Data and Camnera results
+    ## Save points
+    print("Saving points...")
+    Path("reconstructions/{}".format(save_path)).mkdir(parents=True, exist_ok=True)
+    pcd_points = o3d.geometry.PointCloud()
+    for p in droid_visualization.points.items():
+        pcd_points += p[1]
+    pcd_points.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+    o3d.io.write_point_cloud(f"reconstructions/{save_path}/point_cloud.ply", pcd_points, write_ascii=False)
+    ## Save pose
+    print("Saving camera frustums...")
+    pcd_camera = create_camera_actor(True)
+    for c in droid_visualization.cameras.items():
+        pcd_camera += c[1]
+    o3d.io.write_line_set(f"reconstructions/{save_path}/camera.ply", pcd_camera, write_ascii=False)
+
     vis.destroy_window()
