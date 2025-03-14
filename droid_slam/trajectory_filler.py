@@ -2,7 +2,8 @@ import cv2
 import torch
 import lietorch
 
-from lietorch import SE3
+from thirdparty.lietorch.lietorch import SE3
+from thirdparty.lietorch.lietorch.groups import cat
 from collections import OrderedDict
 from factor_graph import FactorGraph
 from droid_net import DroidNet
@@ -100,5 +101,5 @@ class PoseTrajectoryFiller:
             pose_list += self.__fill(tstamps, images, intrinsics)
 
         # stitch pose segments together
-        return lietorch.cat(pose_list, 0)
+        return cat(pose_list, 0)
 

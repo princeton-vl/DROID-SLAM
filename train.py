@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from data_readers.factory import dataset_factory
 
-from lietorch import SO3, SE3, Sim3
+from thirdparty.lietorch.lietorch import SO3, SE3, Sim3
 from geom import losses
 from geom.losses import geodesic_loss, residual_loss, flow_loss
 from geom.graph_utils import build_frame_graph

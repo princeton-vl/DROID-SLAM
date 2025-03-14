@@ -7,7 +7,7 @@ import argparse
 import numpy as np
 import open3d as o3d
 
-from lietorch import SE3
+from thirdparty.lietorch.lietorch import SE3
 import geom.projective_ops as pops
 
 CAM_POINTS = np.array([

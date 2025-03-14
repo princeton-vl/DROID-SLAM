@@ -9,7 +9,6 @@ from modules.corr import CorrBlock
 from modules.gru import ConvGRU
 from modules.clipping import GradientClip
 
-from lietorch import SE3
 from geom.ba import BA
 
 import geom.projective_ops as pops
@@ -77,6 +76,23 @@ class GraphAgg(nn.Module):
 
 class UpdateModule(nn.Module):
     def __init__(self):
+        """
+        Initialize the UpdateModule class.
+        This method sets up the neural network layers and components used in the UpdateModule.
+        It includes the following components:
+        - corr_encoder: A sequential model consisting of two convolutional layers with ReLU activations.
+          It processes the correlation planes.
+        - flow_encoder: A sequential model consisting of two convolutional layers with ReLU activations.
+          It processes the optical flow.
+        - weight: A sequential model consisting of two convolutional layers with ReLU activations,
+          a GradientClip layer, and a Sigmoid activation. It computes the weights.
+        - delta: A sequential model consisting of two convolutional layers with ReLU activations
+          and a GradientClip layer. It computes the delta values.
+        - gru: A ConvGRU layer that processes the concatenated features from corr_encoder, flow_encoder, and other inputs.
+        - agg: A GraphAgg layer that performs graph aggregation.
+        The method also calculates the number of correlation planes (cor_planes) based on the input dimensions.
+        """
+
         super(UpdateModule, self).__init__()
         cor_planes = 4 * (2*3 + 1)**2
 

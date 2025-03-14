@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-from lietorch import SE3, Sim3
+from thirdparty.lietorch.lietorch import SE3, Sim3
 
 MIN_DEPTH = 0.2
 
@@ -9,6 +9,17 @@ def extract_intrinsics(intrinsics):
     return intrinsics[...,None,None,:].unbind(dim=-1)
 
 def coords_grid(ht, wd, **kwargs):
+    """
+    Generates a grid of coordinates.
+    Args:
+        ht (int): Height of the grid.
+        wd (int): Width of the grid.
+        **kwargs: Additional arguments to be passed to the `to` method of the tensors.
+    Returns:
+        torch.Tensor: A tensor of shape (ht, wd, 2) containing the coordinates grid.
+                      The first channel contains the x-coordinates and the second channel contains the y-coordinates.
+    """
+
     y, x = torch.meshgrid(
         torch.arange(ht).to(**kwargs).float(),
         torch.arange(wd).to(**kwargs).float())
@@ -100,7 +111,7 @@ def projective_transform(poses, depths, intrinsics, ii, jj, jacobian=False, retu
     X0, Jz = iproj(depths[:,ii], intrinsics[:,ii], jacobian=jacobian)
     
     # transform
-    Gij = poses[:,jj] * poses[:,ii].inv()
+    Gij = poses[:,jj] * poses[:,ii].inv() # TODO: se rompe aqui!!!
 
     Gij.data[:,ii==jj] = torch.as_tensor([-0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0], device="cuda")
     X1, Ja = actp(Gij, X0, jacobian=jacobian)

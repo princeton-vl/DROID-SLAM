@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import numpy as np
 import torch
-from lietorch import SO3, SE3, Sim3
+from thirdparty.lietorch.lietorch import SO3, SE3, Sim3
 from .graph_utils import graph_to_edge_list
 from .projective_ops import projective_transform
 
