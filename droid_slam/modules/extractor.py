@@ -181,9 +181,16 @@ class BasicEncoder(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        b, n, c1, h1, w1 = x.shape
-        x = x.view(b*n, c1, h1, w1)
-
+        batch_size, num_views, \
+            input_channels, input_height, input_width = x.shape
+        # Flatten batch and views together
+        x = x.view(
+            batch_size*num_views,
+            input_channels,
+            input_height,
+            input_width
+            )
+        # Apply convolutions
         x = self.conv1(x)
         x = self.norm1(x)
         x = self.relu1(x)
@@ -194,5 +201,5 @@ class BasicEncoder(nn.Module):
 
         x = self.conv2(x)
 
-        _, c2, h2, w2 = x.shape
-        return x.view(b, n, c2, h2, w2)
+        batchxviews_size, output_channels, output_height, output_width = x.shape
+        return x.view(batch_size, num_views, output_channels, output_height, output_width)

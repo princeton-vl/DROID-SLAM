@@ -18,6 +18,7 @@ import torch.nn.functional as F
 
 
 
+
 def show_image(image):
     image = image.permute(1, 2, 0).cpu().numpy()
     cv2.imshow('image', image / 255.0)
@@ -44,7 +45,7 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
          0.003680398547259526, 0.9999684752771629, -0.007035845251224894, 
         -0.007729688520722713, 0.007064130529506649, 0.999945173484644
     ]).reshape(3,3)
-    
+
     P_r = np.array([435.2046959714599, 0, 367.4517211914062, -47.90639384423901, 0, 435.2046959714599, 252.2008514404297, 0, 0, 0, 1, 0]).reshape(3,4)
     map_r = cv2.initUndistortRectifyMap(K_r, d_r, R_r, P_r[:3,:3], (752, 480), cv2.CV_32F)
 
@@ -58,15 +59,15 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
     for t, (imgL, imgR) in enumerate(zip(images_left, images_right)):
         if stereo and not os.path.isfile(imgR):
             continue
-        tstamp = float(imgL.split('/')[-1][:-4])        
+        tstamp = float(imgL.split(os.sep)[-1][:-4])
         images = [cv2.remap(cv2.imread(imgL), map_l[0], map_l[1], interpolation=cv2.INTER_LINEAR)]
         if stereo:
             images += [cv2.remap(cv2.imread(imgR), map_r[0], map_r[1], interpolation=cv2.INTER_LINEAR)]
-        
+
         images = torch.from_numpy(np.stack(images, 0))
         images = images.permute(0, 3, 1, 2).to("cuda:0", dtype=torch.float32)
         images = F.interpolate(images, image_size, mode="bilinear", align_corners=False)
-        
+
         intrinsics = torch.as_tensor(intrinsics_vec).cuda()
         intrinsics[0] *= image_size[1] / wd0
         intrinsics[1] *= image_size[0] / ht0
@@ -98,6 +99,9 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=2)
+
+    parser.add_argument("--upsample", action="store_true", default=False)
+
     args = parser.parse_args()
 
     torch.multiprocessing.set_start_method('spawn')
@@ -107,11 +111,11 @@ if __name__ == '__main__':
 
     droid = Droid(args)
     time.sleep(5)
-
     for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2)):
         droid.track(t, image, intrinsics=intrinsics)
 
-    traj_est = droid.terminate(image_stream(args.datapath, stride=1))
+    img_stream = image_stream(args.datapath, stride=1)
+    traj_est = droid.terminate(img_stream)
 
     ### run evaluation ###
 
@@ -121,9 +125,11 @@ if __name__ == '__main__':
     from evo.core import sync
     import evo.main_ape as main_ape
     from evo.core.metrics import PoseRelation
+    from evo.tools.plot import PlotMode
+    import matplotlib.pyplot as plt
 
     images_list = sorted(glob.glob(os.path.join(args.datapath, 'mav0/cam0/data/*.png')))
-    tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
+    tstamps = [float(x.split('\\')[-1][:-4]) for x in images_list]
 
     traj_est = PoseTrajectory3D(
         positions_xyz=1.10 * traj_est[:,:3],
@@ -138,5 +144,16 @@ if __name__ == '__main__':
         pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
 
     print(result)
+
+    # Plot trajectories
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(traj_ref.positions_xyz[:, 0], traj_ref.positions_xyz[:, 1], traj_ref.positions_xyz[:, 2], label='Reference')
+    ax.plot(traj_est.positions_xyz[:, 0], traj_est.positions_xyz[:, 1], traj_est.positions_xyz[:, 2], label='Estimate')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_label('Z')
+    ax.legend()
+    plt.show()
 
 

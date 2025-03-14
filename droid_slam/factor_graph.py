@@ -3,7 +3,7 @@ import lietorch
 import numpy as np
 
 import matplotlib.pyplot as plt
-from lietorch import SE3
+from thirdparty.lietorch.lietorch import SE3
 from modules.corr import CorrBlock, AltCorrBlock
 import geom.projective_ops as pops
 
@@ -119,7 +119,7 @@ class FactorGraph:
             inp = self.video.inps[ii].to(self.device).unsqueeze(0)
             self.inp = inp if self.inp is None else torch.cat([self.inp, inp], 1)
 
-        with torch.cuda.amp.autocast(enabled=False):
+        with torch.amp.autocast('cuda', enabled=False):
             target, _ = self.video.reproject(ii, jj)
             weight = torch.zeros_like(target)
 

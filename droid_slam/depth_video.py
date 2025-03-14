@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-import lietorch
+from thirdparty.lietorch.lietorch import SE3
 import droid_backends
 
 from torch.multiprocessing import Process, Queue, Lock, Value
@@ -139,7 +139,7 @@ class DepthVideo:
     def reproject(self, ii, jj):
         """ project points from ii -> jj """
         ii, jj = DepthVideo.format_indicies(ii, jj)
-        Gs = lietorch.SE3(self.poses[None])
+        Gs = SE3(self.poses[None])
 
         coords, valid_mask = \
             pops.projective_transform(Gs, self.disps[None], self.intrinsics[None], ii, jj)

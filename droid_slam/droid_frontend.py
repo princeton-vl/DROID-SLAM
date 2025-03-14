@@ -2,7 +2,7 @@ import torch
 import lietorch
 import numpy as np
 
-from lietorch import SE3
+from thirdparty.lietorch.lietorch import SE3
 from factor_graph import FactorGraph
 
 

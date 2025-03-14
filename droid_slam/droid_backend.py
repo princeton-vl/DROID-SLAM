@@ -2,7 +2,7 @@ import torch
 import lietorch
 import numpy as np
 
-from lietorch import SE3
+from thirdparty.lietorch.lietorch import SE3
 from factor_graph import FactorGraph
 
 
@@ -20,7 +20,7 @@ class DroidBackend:
         self.backend_thresh = args.backend_thresh
         self.backend_radius = args.backend_radius
         self.backend_nms = args.backend_nms
-        
+
     @torch.no_grad()
     def __call__(self, steps=12):
         """ main update """
@@ -31,9 +31,9 @@ class DroidBackend:
 
         graph = FactorGraph(self.video, self.update_op, corr_impl="alt", max_factors=16*t, upsample=self.upsample)
 
-        graph.add_proximity_factors(rad=self.backend_radius, 
-                                    nms=self.backend_nms, 
-                                    thresh=self.backend_thresh, 
+        graph.add_proximity_factors(rad=self.backend_radius,
+                                    nms=self.backend_nms,
+                                    thresh=self.backend_thresh,
                                     beta=self.beta)
 
         graph.update_lowmem(steps=steps)

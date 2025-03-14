@@ -6,7 +6,7 @@ import cv2
 import os
 import os.path as osp
 
-from lietorch import SE3
+from thirdparty.lietorch.lietorch import SE3
 from .base import RGBDDataset
 from .stream import RGBDStream
 

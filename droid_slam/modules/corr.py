@@ -22,6 +22,19 @@ class CorrSampler(torch.autograd.Function):
 
 class CorrBlock:
     def __init__(self, fmap1, fmap2, num_levels=4, radius=3):
+        """
+        Initializes the CorrBlock class.
+        Args:
+            fmap1 (torch.Tensor): The first feature map tensor.
+            fmap2 (torch.Tensor): The second feature map tensor.
+            num_levels (int, optional): The number of levels in the correlation pyramid. Default is 4.
+            radius (int, optional): The radius for correlation. Default is 3.
+        Attributes:
+            num_levels (int): The number of levels in the correlation pyramid.
+            radius (int): The radius for correlation.
+            corr_pyramid (list): A list to store the correlation pyramid.
+        """
+
         self.num_levels = num_levels
         self.radius = radius
         self.corr_pyramid = []
