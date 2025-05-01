@@ -42,17 +42,22 @@ class FactorGraph:
         self.weight_inac = torch.zeros([1, 0, ht, wd, 2], device=device, dtype=torch.float)
 
     def __filter_repeated_edges(self, ii, jj):
-        """ remove duplicate edges """
+        """remove duplicate edges"""
+        # filter if (ii, jj) insersect with any active edge
+        if len(self.ii) > 0:
+            mask = ((ii[:, None] == self.ii) & (jj[:, None] == self.jj)).any(dim=-1)
+            ii = ii[~mask]
+            jj = jj[~mask]
 
-        keep = torch.zeros(ii.shape[0], dtype=torch.bool, device=ii.device)
-        eset = set(
-            [(i.item(), j.item()) for i, j in zip(self.ii, self.jj)] +
-            [(i.item(), j.item()) for i, j in zip(self.ii_inac, self.jj_inac)])
+        # filter if (ii, jj) intersect with any inactive edge
+        if len(self.ii_inac) > 0:
+            mask = ((ii[:, None] == self.ii_inac) & (jj[:, None] == self.jj_inac)).any(
+                dim=-1
+            )
+            ii = ii[~mask]
+            jj = jj[~mask]
 
-        for k, (i, j) in enumerate(zip(ii, jj)):
-            keep[k] = (i.item(), j.item()) not in eset
-
-        return ii[keep], jj[keep]
+        return ii, jj
 
     def print_edges(self):
         ii = self.ii.cpu().numpy()
@@ -165,17 +170,18 @@ class FactorGraph:
     def rm_keyframe(self, ix):
         """ drop edges from factor graph """
 
+        t = self.video.counter.value
+        # with self.video.get_lock():
+        self.video.images[ix : t - 1] = self.video.images[ix + 1 : t].clone()
+        self.video.poses[ix : t - 1] = self.video.poses[ix + 1 : t].clone()
+        self.video.disps[ix : t - 1] = self.video.disps[ix + 1 : t].clone()
+        self.video.disps_sens[ix : t - 1] = self.video.disps_sens[ix + 1 : t].clone()
+        self.video.intrinsics[ix : t - 1] = self.video.intrinsics[ix + 1 : t].clone()
 
-        with self.video.get_lock():
-            self.video.images[ix] = self.video.images[ix+1]
-            self.video.poses[ix] = self.video.poses[ix+1]
-            self.video.disps[ix] = self.video.disps[ix+1]
-            self.video.disps_sens[ix] = self.video.disps_sens[ix+1]
-            self.video.intrinsics[ix] = self.video.intrinsics[ix+1]
-
-            self.video.nets[ix] = self.video.nets[ix+1]
-            self.video.inps[ix] = self.video.inps[ix+1]
-            self.video.fmaps[ix] = self.video.fmaps[ix+1]
+        self.video.nets[ix : t - 1] = self.video.nets[ix + 1 : t].clone()
+        self.video.inps[ix : t - 1] = self.video.inps[ix + 1 : t].clone()
+        self.video.fmaps[ix : t - 1] = self.video.fmaps[ix + 1 : t].clone()
+        self.video.tstamp[ix: t - 1] = self.video.tstamp[ix + 1 : t].clone()
 
         m = (self.ii_inac == ix) | (self.jj_inac == ix)
         self.ii_inac[self.ii_inac >= ix] -= 1
@@ -184,15 +190,14 @@ class FactorGraph:
         if torch.any(m):
             self.ii_inac = self.ii_inac[~m]
             self.jj_inac = self.jj_inac[~m]
-            self.target_inac = self.target_inac[:,~m]
-            self.weight_inac = self.weight_inac[:,~m]
+            self.target_inac = self.target_inac[:, ~m]
+            self.weight_inac = self.weight_inac[:, ~m]
 
         m = (self.ii == ix) | (self.jj == ix)
 
         self.ii[self.ii >= ix] -= 1
         self.jj[self.jj >= ix] -= 1
         self.rm_factors(m, store=False)
-
 
     @torch.cuda.amp.autocast(enabled=True)
     def update(self, t0=None, t1=None, itrs=2, use_inactive=False, EP=1e-7, motion_only=False):

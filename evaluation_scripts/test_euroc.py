@@ -89,7 +89,7 @@ if __name__ == '__main__':
     parser.add_argument("--beta", type=float, default=0.3)
     parser.add_argument("--filter_thresh", type=float, default=2.4)
     parser.add_argument("--warmup", type=int, default=15)
-    parser.add_argument("--keyframe_thresh", type=float, default=3.5)
+    parser.add_argument("--keyframe_thresh", type=float, default=3.0)
     parser.add_argument("--frontend_thresh", type=float, default=17.5)
     parser.add_argument("--frontend_window", type=int, default=20)
     parser.add_argument("--frontend_radius", type=int, default=2)
@@ -98,6 +98,8 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=2)
+    parser.add_argument("--upsample", action="store_true")
+
     args = parser.parse_args()
 
     torch.multiprocessing.set_start_method('spawn')

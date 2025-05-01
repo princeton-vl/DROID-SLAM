@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-TUM_PATH=datasets/TUM-RGBD/$seq
+TUM_PATH=datasets/TUM-RGBD/
 
 evalset=(
     rgbd_dataset_freiburg1_360

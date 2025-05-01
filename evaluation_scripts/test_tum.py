@@ -59,18 +59,22 @@ if __name__ == '__main__':
     parser.add_argument("--image_size", default=[240, 320])
     parser.add_argument("--disable_vis", action="store_true")
 
-    parser.add_argument("--beta", type=float, default=0.6)
-    parser.add_argument("--filter_thresh", type=float, default=1.75)
+    parser.add_argument("--beta", type=float, default=0.3)
+    parser.add_argument("--filter_thresh", type=float, default=1.5)
     parser.add_argument("--warmup", type=int, default=12)
-    parser.add_argument("--keyframe_thresh", type=float, default=2.25)
+    parser.add_argument("--keyframe_thresh", type=float, default=2.0)
     parser.add_argument("--frontend_thresh", type=float, default=12.0)
     parser.add_argument("--frontend_window", type=int, default=25)
     parser.add_argument("--frontend_radius", type=int, default=2)
     parser.add_argument("--frontend_nms", type=int, default=1)
 
-    parser.add_argument("--backend_thresh", type=float, default=15.0)
+    parser.add_argument("--backend_thresh", type=float, default=20.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=3)
+
+    parser.add_argument("--upsample", action="store_true")
+    parser.add_argument("--motion_damping", type=float, default=0.5)
+
     args = parser.parse_args()
 
     args.stereo = False

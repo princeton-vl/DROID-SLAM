@@ -2,15 +2,6 @@
 
 mkdir -p data && cd data
 
-
-gdown https://drive.google.com/uc?id=1AlfhZnGmlsKWGcNHFB1i8i8Jzn4VHB15
-unzip abandonedfactory.zip
-rm abandonedfactory.zip
-
-gdown https://drive.google.com/uc?id=0B-ePgl6HF260NzQySklGdXZyQzA
-unzip Barn.zip
-rm Barn.zip
-
 wget https://www.eth3d.net/data/slam/datasets/sfm_bench_mono.zip
 unzip sfm_bench_mono.zip
 rm sfm_bench_mono.zip
