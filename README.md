@@ -61,23 +61,15 @@ python setup.py install
 Run the demo on any of the samples (all demos can be run on a GPU with 11G of memory). While running, press the "s" key to increase the filtering threshold (= more points) and "a" to decrease the filtering threshold (= fewer points). To save the reconstruction with full resolution depth maps use the `--reconstruction_path` flag.
 
 
-```Python
-python demo.py --imagedir=data/abandonedfactory --calib=calib/tartan.txt --stride=2
-```
-
-```Python
+```Bash
 python demo.py --imagedir=data/sfm_bench/rgb --calib=calib/eth.txt
 ```
 
-```Python
-python demo.py --imagedir=data/Barn --calib=calib/barn.txt --stride=1 --backend_nms=4
-```
-
-```Python
+```Bash
 python demo.py --imagedir=data/mav0/cam0/data --calib=calib/euroc.txt --t0=150
 ```
 
-```Python
+```Bash
 python demo.py --imagedir=data/rgbd_dataset_freiburg3_cabinet/rgb --calib=calib/tum3.txt
 ```
 
@@ -92,29 +84,63 @@ with parameters in brackets optional.
 We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir and ETH will require 24G of memory.
 
 ### TartanAir (Mono + Stereo)
+
+Download the [TartanAir](https://theairlab.org/tartanair-dataset/) test set and put them in `data/tartanair_test/`.
+
+[Images](https://drive.google.com/file/d/1N8qoU-oEjRKdaKSrHPWA-xsnRtofR_jJ/view) 
+
+[Groundtruth](https://cmu.box.com/shared/static/3p1sf0eljfwrz4qgbpc6g95xtn2alyfk.zip) 
+
+**Monocular evaluation:**
+```bash
+python evaluation_scripts/test_tartanair.py \
+  --datapath data/tartanair_test/mono \
+  --gt_path data/tartanair_test/mono_gt \
+  --disable_vis
+```
+
+**Stereo evaluation:**
+```bash
+python evaluation_scripts/test_tartanair.py \
+  --datapath data/tartanair_test/stereo \
+  --gt_path data/tartanair_test/stereo_gt \
+  --stereo --disable_vis
+```
+
+
+**Evaluating on the validation split:**
+
 Download the [TartanAir](https://theairlab.org/tartanair-dataset/) dataset using the script `thirdparty/tartanair_tools/download_training.py` and put them in `datasets/TartanAir`
 ```Bash
-./tools/validate_tartanair.sh --plot_curve            # monocular eval
-./tools/validate_tartanair.sh --plot_curve  --stereo  # stereo eval
+# monocular eval
+./tools/validate_tartanair.sh --plot_curve
+
+# stereo eval
+./tools/validate_tartanair.sh --plot_curve  --stereo
 ```
 
 ### EuRoC (Mono + Stereo)
 Download the [EuRoC](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets) sequences (ASL format) and put them in `datasets/EuRoC`
 ```Bash
-./tools/evaluate_euroc.sh                             # monocular eval
-./tools/evaluate_euroc.sh --stereo                    # stereo eval
+# monocular eval
+./tools/evaluate_euroc.sh
+
+# stereo eval
+./tools/evaluate_euroc.sh --stereo
 ```
 
 ### TUM-RGBD (Mono)
 Download the fr1 sequences from [TUM-RGBD](https://vision.in.tum.de/data/datasets/rgbd-dataset/download) and put them in `datasets/TUM-RGBD`
 ```Bash
-./tools/evaluate_tum.sh                               # monocular eval
+# monocular eval
+./tools/evaluate_tum.sh
 ```
 
 ### ETH3D (RGB-D)
 Download the [ETH3D](https://www.eth3d.net/slam_datasets) dataset
 ```Bash
-./tools/evaluate_eth3d.sh                             # RGB-D eval
+# RGB-D eval
+./tools/evaluate_eth3d.sh
 ```
 
 ## Training

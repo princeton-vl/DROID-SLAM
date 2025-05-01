@@ -62,6 +62,7 @@ def droid_visualization(video, device="cuda:0"):
     droid_visualization.ix = 0
 
     droid_visualization.filter_thresh = 0.005
+    droid_visualization.is_initialized = False
 
     def increase_filter(vis):
         droid_visualization.filter_thresh *= 2
@@ -75,6 +76,12 @@ def droid_visualization(video, device="cuda:0"):
 
     def animation_callback(vis):
         cam = vis.get_view_control().convert_to_pinhole_camera_parameters()
+
+        if not droid_visualization.is_initialized:
+            extrinsics = np.eye(4)
+            extrinsics[2, 3] = 2.0
+            cam.extrinsic = extrinsics
+            droid_visualization.is_initialized = True
 
         with torch.no_grad():
 
@@ -134,8 +141,7 @@ def droid_visualization(video, device="cuda:0"):
                 droid_visualization.points[ix] = point_actor
 
             # hack to allow interacting with vizualization during inference
-            if len(droid_visualization.cameras) >= droid_visualization.warmup:
-                cam = vis.get_view_control().convert_from_pinhole_camera_parameters(cam)
+            cam = vis.get_view_control().convert_from_pinhole_camera_parameters(cam)
 
             droid_visualization.ix += 1
             vis.poll_events()

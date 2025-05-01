@@ -2,6 +2,8 @@ import sys
 sys.path.append('droid_slam')
 sys.path.append('thirdparty/tartanair_tools')
 
+from evaluation.tartanair_evaluator import TartanAirEvaluator
+
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -15,13 +17,28 @@ import argparse
 
 from droid import Droid
 
+# camera baseline hardcoded to 0.1m
+STEREO_SCALE_FACTOR = 2.5
+
+MONO_TEST_SCENES = [f"M{s}{i:03d}" for s in ["E", "H"] for i in range(8)]
+STEREO_TEST_SCENES = [f"S{s}{i:03d}" for s in ["E", "H"] for i in range(8)]
+
+
 def image_stream(datapath, image_size=[384, 512], intrinsics_vec=[320.0, 320.0, 320.0, 240.0], stereo=False):
     """ image generator """
 
     # read all png images in folder
     ht0, wd0 = [480, 640]
-    images_left = sorted(glob.glob(os.path.join(datapath, 'image_left/*.png')))
-    images_right = sorted(glob.glob(os.path.join(datapath, 'image_right/*.png')))
+
+    if stereo:
+        images_left = sorted(glob.glob(os.path.join(datapath, 'image_left/*.png')))
+        images_right = sorted(glob.glob(os.path.join(datapath, 'image_right/*.png')))
+
+    else:
+        if os.path.exists(os.path.join(datapath, "image_left")):
+            images_left = sorted(glob.glob(os.path.join(datapath, 'image_left/*.png')))
+        else:
+            images_left = sorted(glob.glob(os.path.join(datapath, '*.png')))
 
     data = []
     for t in range(len(images_left)):
@@ -39,7 +56,9 @@ def image_stream(datapath, image_size=[384, 512], intrinsics_vec=[320.0, 320.0, 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--datapath", default="datasets/TartanAir")
+    parser.add_argument("--datapath")
+    parser.add_argument("--gt_path")
+
     parser.add_argument("--weights", default="droid.pth")
     parser.add_argument("--buffer", type=int, default=1000)
     parser.add_argument("--image_size", default=[384,512])
@@ -49,9 +68,9 @@ if __name__ == '__main__':
     parser.add_argument("--id", type=int, default=-1)
 
     parser.add_argument("--beta", type=float, default=0.3)
-    parser.add_argument("--filter_thresh", type=float, default=2.4)
+    parser.add_argument("--filter_thresh", type=float, default=2.5)
     parser.add_argument("--warmup", type=int, default=12)
-    parser.add_argument("--keyframe_thresh", type=float, default=3.5)
+    parser.add_argument("--keyframe_thresh", type=float, default=3.0)
     parser.add_argument("--frontend_thresh", type=float, default=15)
     parser.add_argument("--frontend_window", type=int, default=20)
     parser.add_argument("--frontend_radius", type=int, default=1)
@@ -60,48 +79,57 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=20.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=3)
+
+    # damped linear velocity model
+    parser.add_argument("--motion_damping", type=int, default=0.5)
+
     parser.add_argument("--upsample", action="store_true")
 
     args = parser.parse_args()
     torch.multiprocessing.set_start_method('spawn')
 
-    from data_readers.tartan import test_split
-    from evaluation.tartanair_evaluator import TartanAirEvaluator
 
     if not os.path.isdir("figures"):
         os.mkdir("figures")
 
-    if args.id >= 0:
-        test_split = [ test_split[args.id] ]
+    test_scenes = STEREO_TEST_SCENES if args.stereo else MONO_TEST_SCENES
 
     ate_list = []
-    for scene in test_split:
+    # for scene in MONO_TEST_SCENES:
+    for scene in test_scenes:
         print("Performing evaluation on {}".format(scene))
         torch.cuda.empty_cache()
         droid = Droid(args)
 
         scenedir = os.path.join(args.datapath, scene)
-        
+        gt_file = os.path.join(args.gt_path, f"{scene}.txt")
+
         for (tstamp, image, intrinsics) in tqdm(image_stream(scenedir, stereo=args.stereo)):
             droid.track(tstamp, image, intrinsics=intrinsics)
 
         # fill in non-keyframe poses + global BA
         traj_est = droid.terminate(image_stream(scenedir))
 
+        if args.stereo:
+            traj_est[:, :3] *= STEREO_SCALE_FACTOR
+
         ### do evaluation ###
         evaluator = TartanAirEvaluator()
-        gt_file = os.path.join(scenedir, "pose_left.txt")
         traj_ref = np.loadtxt(gt_file, delimiter=' ')[:, [1, 2, 0, 4, 5, 3, 6]] # ned -> xyz
 
         # usually stereo should not be scale corrected, but we are comparing monocular and stereo here
         results = evaluator.evaluate_one_trajectory(
-            traj_ref, traj_est, scale=True, title=scenedir[-20:].replace('/', '_'))
+            traj_ref, traj_est, scale=not args.stereo, title=scenedir[-20:].replace('/', '_'))
         
         print(results)
         ate_list.append(results["ate_score"])
 
     print("Results")
+    for (scene, ate) in zip(test_scenes, ate_list):
+        print(f"{scene}: {ate}")
+
     print(ate_list)
+    print("Mean ATE", np.mean(ate_list))
 
     if args.plot_curve:
         import matplotlib.pyplot as plt
