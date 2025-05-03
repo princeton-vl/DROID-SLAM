@@ -35,7 +35,7 @@ class Droid:
         # visualizer
         if not self.disable_vis:
             from visualizer.droid_visualizer import visualization_fn
-            self.visualizer = Process(target=visualization_fn, args=(self.video,))
+            self.visualizer = Process(target=visualization_fn, args=(self.video, None))
             self.visualizer.start()
 
         # post processor - fill in poses for non-keyframes
