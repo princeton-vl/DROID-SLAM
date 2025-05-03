@@ -11,13 +11,11 @@ import glob
 import time
 import argparse
 
-from pathlib import Path
 from torch.multiprocessing import Process
-from droid import Droid
-from droid_async import DroidAsync
-
+from droid_multi import Droid
 
 import torch.nn.functional as F
+
 
 
 def show_image(image):
@@ -87,7 +85,6 @@ if __name__ == '__main__':
     parser.add_argument("--image_size", default=[320,512])
     parser.add_argument("--disable_vis", action="store_true")
     parser.add_argument("--stereo", action="store_true")
-    parser.add_argument("--asynchronous", action="store_true")
 
     parser.add_argument("--beta", type=float, default=0.3)
     parser.add_argument("--filter_thresh", type=float, default=2.4)
@@ -110,10 +107,10 @@ if __name__ == '__main__':
     print("Running evaluation on {}".format(args.datapath))
     print(args)
 
-    droid = DroidAsync(args) if args.asynchronous else Droid(args)
-    scene = Path(args.datapath).name
+    droid = Droid(args)
+    time.sleep(5)
 
-    for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2), desc=scene):
+    for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2)):
         droid.track(t, image, intrinsics=intrinsics)
 
     traj_est = droid.terminate(image_stream(args.datapath, stride=1))

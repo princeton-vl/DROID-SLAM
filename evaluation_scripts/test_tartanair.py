@@ -16,6 +16,7 @@ import yaml
 import argparse
 
 from droid import Droid
+from droid_async import DroidAsync
 
 # camera baseline hardcoded to 0.1m
 STEREO_SCALE_FACTOR = 2.5
@@ -84,6 +85,7 @@ if __name__ == '__main__':
     parser.add_argument("--motion_damping", type=int, default=0.5)
 
     parser.add_argument("--upsample", action="store_true")
+    parser.add_argument("--asynchronous", action="store_true")
 
     args = parser.parse_args()
     torch.multiprocessing.set_start_method('spawn')
@@ -95,16 +97,16 @@ if __name__ == '__main__':
     test_scenes = STEREO_TEST_SCENES if args.stereo else MONO_TEST_SCENES
 
     ate_list = []
-    # for scene in MONO_TEST_SCENES:
     for scene in test_scenes:
         print("Performing evaluation on {}".format(scene))
         torch.cuda.empty_cache()
-        droid = Droid(args)
+
+        droid = DroidAsync(args) if args.asynchronous else Droid(args)
 
         scenedir = os.path.join(args.datapath, scene)
         gt_file = os.path.join(args.gt_path, f"{scene}.txt")
 
-        for (tstamp, image, intrinsics) in tqdm(image_stream(scenedir, stereo=args.stereo)):
+        for (tstamp, image, intrinsics) in tqdm(image_stream(scenedir, stereo=args.stereo), desc=scene):
             droid.track(tstamp, image, intrinsics=intrinsics)
 
         # fill in non-keyframe poses + global BA

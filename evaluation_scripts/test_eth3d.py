@@ -68,9 +68,9 @@ if __name__ == '__main__':
     parser.add_argument("--warmup", type=int, default=8)
     parser.add_argument("--keyframe_thresh", type=float, default=3.5)
     parser.add_argument("--frontend_thresh", type=float, default=16.0)
-    parser.add_argument("--frontend_window", type=int, default=16)
-    parser.add_argument("--frontend_radius", type=int, default=1)
-    parser.add_argument("--frontend_nms", type=int, default=0)
+    parser.add_argument("--frontend_window", type=int, default=20)
+    parser.add_argument("--frontend_radius", type=int, default=2)
+    parser.add_argument("--frontend_nms", type=int, default=1)
 
     parser.add_argument("--stereo", action="store_true")
     parser.add_argument("--depth", action="store_true")
@@ -79,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=3)
     parser.add_argument("--upsample", action="store_true")
+    parser.add_argument("--motion_damping", type=float, default=0.5)
 
     args = parser.parse_args()
 

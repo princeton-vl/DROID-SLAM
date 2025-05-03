@@ -1,356 +1,218 @@
 #include <torch/extension.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
+#include <THC/THCAtomics.cuh>
 #include <vector>
-#include <cuda_fp16.h>
-#include <cuda_runtime.h>
+#include <iostream>
 
+using namespace torch::indexing;
 
-#include <ATen/ATen.h>
-#include <ATen/NativeFunctions.h>
-#include <ATen/cuda/CUDAApplyUtils.cuh>
-#include <ATen/native/cuda/KernelUtils.cuh>
-
-
-
-#define BLOCK_H 4
-#define BLOCK_W 8
-#define BLOCK_HW BLOCK_H * BLOCK_W
-#define CHANNEL_STRIDE 32
-
+#define THREADS 256
+#define BLOCKS(n) (n + THREADS - 1) / THREADS
 
 __forceinline__ __device__
 bool within_bounds(int h, int w, int H, int W) {
   return h >= 0 && h < H && w >= 0 && w < W;
 }
 
+
 template <typename scalar_t>
-__global__ void altcorr_forward_kernel(
-    const torch::PackedTensorAccessor32<scalar_t,4,torch::RestrictPtrTraits> fmap1,
-    const torch::PackedTensorAccessor32<scalar_t,4,torch::RestrictPtrTraits> fmap2,
+__global__ void corr_forward_kernel(int R,
+    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap1,
+    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap2,
     const torch::PackedTensorAccessor32<float,5,torch::RestrictPtrTraits> coords,
-    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> corr,
-    int r)
+    const torch::PackedTensorAccessor32<long,1,torch::RestrictPtrTraits> us,
+    const torch::PackedTensorAccessor32<long,1,torch::RestrictPtrTraits> vs,
+    torch::PackedTensorAccessor32<scalar_t,6,torch::RestrictPtrTraits> corr)
 {
-  const int b = blockIdx.x;
-  const int h0 = blockIdx.y * blockDim.x;
-  const int w0 = blockIdx.z * blockDim.y;
-  const int tid = threadIdx.x * blockDim.y + threadIdx.y;
+  // diameter
+  const int D = 2*R + 2;
 
-  const int H1 = fmap1.size(1);
-  const int W1 = fmap1.size(2);
-  const int H2 = fmap2.size(1);
-  const int W2 = fmap2.size(2);
-  const int N = coords.size(1);
-  const int C = fmap1.size(3);
+  const int B = coords.size(0);
+  const int M = coords.size(1);
+  const int H = coords.size(3);
+  const int W = coords.size(4);
 
-  __shared__ scalar_t f1[CHANNEL_STRIDE][BLOCK_HW];
-  __shared__ scalar_t f2[CHANNEL_STRIDE][BLOCK_HW];
-  
-  __shared__ float x2s[BLOCK_HW];
-  __shared__ float y2s[BLOCK_HW];
+  const int C = fmap1.size(2);
+  const int H2 = fmap2.size(3);
+  const int W2 = fmap2.size(4);
 
-  for (int c=0; c<C; c+=CHANNEL_STRIDE) {
-    for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
-      int k1 = k + tid / CHANNEL_STRIDE;
-      int h1 = h0 + k1 / BLOCK_W;
-      int w1 = w0 + k1 % BLOCK_W;
-      int c1 = tid % CHANNEL_STRIDE;
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
 
-      if (within_bounds(h1, w1, H1, W1))
-        f1[c1][k1] = fmap1[b][h1][w1][c+c1];
-      
-      else
-        f1[c1][k1] = 0.0;
-    }
+  if (n < B * M * H * W * D * D) {
+    const int jj = n % D; n /= D;
+    const int ii = n % D; n /= D;
+    const int j0 = n % W; n /= W;
+    const int i0 = n % H; n /= H;
+    const int  m = n % M; n /= M;
 
-    __syncthreads();
+    const int ix = us[m];
+    const int jx = vs[m];
 
-    for (int n=0; n<N; n++) {
-      int h1 = h0 + threadIdx.x;
-      int w1 = w0 + threadIdx.y;
-      if (within_bounds(h1, w1, H1, W1)) {
-        x2s[tid] = coords[b][n][h1][w1][0];
-        y2s[tid] = coords[b][n][h1][w1][1];
+    const float x = coords[n][m][0][i0][j0];
+    const float y = coords[n][m][1][i0][j0];
+
+    const int i1 = static_cast<int>(floor(y)) + (ii - R);
+    const int j1 = static_cast<int>(floor(x)) + (jj - R);
+
+    // accumulate in fp32
+    float s = 0;
+    if (within_bounds(i1, j1, H2, W2)) {
+      for (int i = 0; i < C; i++) {
+        const scalar_t f1 = fmap1[n][ix][i][i0][j0] / 4.0;
+        const scalar_t f2 = fmap2[n][jx][i][i1][j1] / 4.0;
+        s += static_cast<float>(f1 * f2);
       }
-
-      float dx = x2s[tid] - floor(x2s[tid]);
-      float dy = y2s[tid] - floor(y2s[tid]);
-
-      int rd = 2*r + 1;
-      for (int iy=0; iy<rd+1; iy++) {
-        for (int ix=0; ix<rd+1; ix++) {
-          for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
-            int k1 = k + tid / CHANNEL_STRIDE;
-            int h2 = static_cast<int>(floor(y2s[k1])) - r + iy;
-            int w2 = static_cast<int>(floor(x2s[k1])) - r + ix;
-            int c2 = tid % CHANNEL_STRIDE;
-
-            if (within_bounds(h2, w2, H2, W2))
-              f2[c2][k1] = fmap2[b][h2][w2][c+c2];
-            
-            else
-              f2[c2][k1] = static_cast<scalar_t>(0.0);
-          }
-
-          __syncthreads();
-      
-          scalar_t s = 0.0;
-          for (int k=0; k<CHANNEL_STRIDE; k++)
-            s += f1[k][tid] * f2[k][tid];
-
-          int ix_nw = H1*W1*((iy-1) + rd*(ix-1));
-          int ix_ne = H1*W1*((iy-1) + rd*ix);
-          int ix_sw = H1*W1*(iy + rd*(ix-1));
-          int ix_se = H1*W1*(iy + rd*ix);
-
-          // int ix_nw = ((iy-1) + rd*(ix-1));
-          // int ix_ne = ((iy-1) + rd*ix);
-          // int ix_sw = (iy + rd*(ix-1));
-          // int ix_se = (iy + rd*ix);
-
-          scalar_t nw = s * static_cast<scalar_t>((dy) * (dx));
-          scalar_t ne = s * static_cast<scalar_t>((dy) * (1-dx));
-          scalar_t sw = s * static_cast<scalar_t>((1-dy) * (dx));
-          scalar_t se = s * static_cast<scalar_t>((1-dy) * (1-dx));
-
-          // if (iy > 0 && ix > 0 && within_bounds(h1, w1, H1, W1))
-          //   corr[b][n][ix_nw][h1][w1] += nw;
-
-          // if (iy > 0 && ix < rd && within_bounds(h1, w1, H1, W1))
-          //   corr[b][n][ix_ne][h1][w1] += ne;
-
-          // if (iy < rd && ix > 0 && within_bounds(h1, w1, H1, W1))
-          //   corr[b][n][ix_sw][h1][w1] += sw;
-
-          // if (iy < rd && ix < rd && within_bounds(h1, w1, H1, W1))
-          //   corr[b][n][ix_se][h1][w1] += se;
-
-
-          scalar_t* corr_ptr = &corr[b][n][0][h1][w1];
-
-          if (iy > 0 && ix > 0 && within_bounds(h1, w1, H1, W1))
-            *(corr_ptr + ix_nw) += nw;
-
-          if (iy > 0 && ix < rd && within_bounds(h1, w1, H1, W1))
-            *(corr_ptr + ix_ne) += ne;
-
-          if (iy < rd && ix > 0 && within_bounds(h1, w1, H1, W1))
-            *(corr_ptr + ix_sw) += sw;
-
-          if (iy < rd && ix < rd && within_bounds(h1, w1, H1, W1))
-            *(corr_ptr + ix_se) += se;
-
-
-        }
-      } 
     }
+
+    corr[n][m][ii][jj][i0][j0] = static_cast<scalar_t>(s);
   }
 }
 
 
 template <typename scalar_t>
-__global__ void altcorr_backward_kernel(
-    const torch::PackedTensorAccessor32<scalar_t,4,torch::RestrictPtrTraits> fmap1,
-    const torch::PackedTensorAccessor32<scalar_t,4,torch::RestrictPtrTraits> fmap2,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> coords,
-    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> corr_grad,
-    torch::PackedTensorAccessor32<scalar_t,4,torch::RestrictPtrTraits> fmap1_grad,
-    torch::PackedTensorAccessor32<scalar_t,4,torch::RestrictPtrTraits> fmap2_grad,
-    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> coords_grad,
-    int r)
+__global__ void corr_backward_kernel(int R,
+    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap1,
+    const torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap2,
+    const torch::PackedTensorAccessor32<float,5,torch::RestrictPtrTraits> coords,
+    const torch::PackedTensorAccessor32<long,1,torch::RestrictPtrTraits> us,
+    const torch::PackedTensorAccessor32<long,1,torch::RestrictPtrTraits> vs,
+    const torch::PackedTensorAccessor32<float,6,torch::RestrictPtrTraits> corr_grad,
+    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap1_grad,
+    torch::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> fmap2_grad)
 {
+  // diameter
+  const int D = 2*R + 2;
 
-  const int b = blockIdx.x;
-  const int h0 = blockIdx.y * blockDim.x;
-  const int w0 = blockIdx.z * blockDim.y;
-  const int tid = threadIdx.x * blockDim.y + threadIdx.y;
+  const int B = coords.size(0);
+  const int M = coords.size(1);
+  const int H = coords.size(3);
+  const int W = coords.size(4);
 
-  const int H1 = fmap1.size(1);
-  const int W1 = fmap1.size(2);
-  const int H2 = fmap2.size(1);
-  const int W2 = fmap2.size(2);
-  const int N = coords.size(1);
-  const int C = fmap1.size(3);
+  const int C = fmap1.size(2);
+  const int H2 = fmap2.size(3);
+  const int W2 = fmap2.size(4);
 
-  __shared__ scalar_t f1[CHANNEL_STRIDE][BLOCK_HW+1];
-  __shared__ scalar_t f2[CHANNEL_STRIDE][BLOCK_HW+1];
+  int n = blockIdx.x * blockDim.x + threadIdx.x;
 
-  __shared__ scalar_t f1_grad[CHANNEL_STRIDE][BLOCK_HW+1];
-  __shared__ scalar_t f2_grad[CHANNEL_STRIDE][BLOCK_HW+1];
+  if (n < B * M * H * W * D * D) {
+    const int jj = n % D; n /= D;
+    const int ii = n % D; n /= D;
+    const int j0 = n % W; n /= W;
+    const int i0 = n % H; n /= H;
+    const int  m = n % M; n /= M;
 
-  __shared__ scalar_t x2s[BLOCK_HW];
-  __shared__ scalar_t y2s[BLOCK_HW];
+    const int ix = us[m];
+    const int jx = vs[m];
 
-  for (int c=0; c<C; c+=CHANNEL_STRIDE) {
+    const float x = coords[n][m][0][i0][j0];
+    const float y = coords[n][m][1][i0][j0];
 
-    for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
-      int k1 = k + tid / CHANNEL_STRIDE;
-      int h1 = h0 + k1 / BLOCK_W;
-      int w1 = w0 + k1 % BLOCK_W;
-      int c1 = tid % CHANNEL_STRIDE;
+    const int i1 = static_cast<int>(floor(y)) + (ii - R);
+    const int j1 = static_cast<int>(floor(x)) + (jj - R);
 
-      auto fptr = fmap1[b][h1][w1];
-      if (within_bounds(h1, w1, H1, W1))
-        f1[c1][k1] = fptr[c+c1];
-      else
-        f1[c1][k1] = 0.0;
+    const scalar_t g = (scalar_t) corr_grad[n][m][ii][jj][i0][j0];
 
-      f1_grad[c1][k1] = 0.0;
-    }
-
-    __syncthreads();
-
-    int h1 = h0 + threadIdx.x;
-    int w1 = w0 + threadIdx.y;
-
-    for (int n=0; n<N; n++) {  
-      x2s[tid] = coords[b][n][h1][w1][0];
-      y2s[tid] = coords[b][n][h1][w1][1];
-
-      scalar_t dx = x2s[tid] - floor(x2s[tid]);
-      scalar_t dy = y2s[tid] - floor(y2s[tid]);
-
-      int rd = 2*r + 1;
-      for (int iy=0; iy<rd+1; iy++) {
-        for (int ix=0; ix<rd+1; ix++) {
-          for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
-            int k1 = k + tid / CHANNEL_STRIDE;
-            int h2 = static_cast<int>(floor(y2s[k1]))-r+iy;
-            int w2 = static_cast<int>(floor(x2s[k1]))-r+ix;
-            int c2 = tid % CHANNEL_STRIDE;
-
-            auto fptr = fmap2[b][h2][w2];
-            if (within_bounds(h2, w2, H2, W2))
-              f2[c2][k1] = fptr[c+c2];
-            else
-              f2[c2][k1] = 0.0;
-
-            f2_grad[c2][k1] = 0.0;
-          }
-
-          __syncthreads();
-      
-          const scalar_t* grad_ptr = &corr_grad[b][n][0][h1][w1];
-          scalar_t g = 0.0;
-
-          int ix_nw = H1*W1*((iy-1) + rd*(ix-1));
-          int ix_ne = H1*W1*((iy-1) + rd*ix);
-          int ix_sw = H1*W1*(iy + rd*(ix-1));
-          int ix_se = H1*W1*(iy + rd*ix);
-
-          if (iy > 0 && ix > 0 && within_bounds(h1, w1, H1, W1))
-            g +=  *(grad_ptr + ix_nw) * dy * dx;
-
-          if (iy > 0 && ix < rd && within_bounds(h1, w1, H1, W1))
-            g += *(grad_ptr + ix_ne) * dy * (1-dx);
-
-          if (iy < rd && ix > 0 && within_bounds(h1, w1, H1, W1))
-            g += *(grad_ptr + ix_sw) * (1-dy) * dx;
-
-          if (iy < rd && ix < rd && within_bounds(h1, w1, H1, W1))
-            g += *(grad_ptr + ix_se) * (1-dy) * (1-dx);
-            
-          for (int k=0; k<CHANNEL_STRIDE; k++) {
-            f1_grad[k][tid] += g * f2[k][tid];
-            f2_grad[k][tid] += g * f1[k][tid];
-          }
-
-          for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
-            int k1 = k + tid / CHANNEL_STRIDE;
-            int h2 = static_cast<int>(floor(y2s[k1]))-r+iy;
-            int w2 = static_cast<int>(floor(x2s[k1]))-r+ix;
-            int c2 = tid % CHANNEL_STRIDE;
-
-            scalar_t* fptr = &fmap2_grad[b][h2][w2][0];
-            if (within_bounds(h2, w2, H2, W2))
-              atomicAdd(fptr+c+c2, f2_grad[c2][k1]);
-          }
-        }
-      } 
-    }
-    __syncthreads();
-
-
-    for (int k=0; k<BLOCK_HW; k+=BLOCK_HW/CHANNEL_STRIDE) {
-      int k1 = k + tid / CHANNEL_STRIDE;
-      int h1 = h0 + k1 / BLOCK_W;
-      int w1 = w0 + k1 % BLOCK_W;
-      int c1 = tid % CHANNEL_STRIDE;
-
-      scalar_t* fptr = &fmap1_grad[b][h1][w1][0];
-      if (within_bounds(h1, w1, H1, W1))
-        fptr[c+c1] += f1_grad[c1][k1];
+    if (within_bounds(i1, j1, H2, W2)) {
+      #pragma unroll 32
+      for (int i=0; i<C; i++) {
+        atomicAdd(&fmap1_grad[n][ix][i][i0][j0], g * fmap2[n][jx][i][i1][j1]);
+        atomicAdd(&fmap2_grad[n][jx][i][i1][j1], g * fmap1[n][ix][i][i0][j0]);
+      }
     }
   }
 }
-
 
 
 std::vector<torch::Tensor> altcorr_cuda_forward(
   torch::Tensor fmap1,
   torch::Tensor fmap2,
   torch::Tensor coords,
+  torch::Tensor ii,
+  torch::Tensor jj,
   int radius)
 {
-  const auto B = coords.size(0);
-  const auto N = coords.size(1);
-  const auto H = coords.size(2);
-  const auto W = coords.size(3);
+  const int B = coords.size(0);
+  const int M = coords.size(1);
 
-  const auto rd = 2 * radius + 1;
+  const int H = coords.size(3);
+  const int W = coords.size(4);
+  const int D = 2 * radius + 2;
+
   auto opts = fmap1.options();
-  auto corr = torch::zeros({B, N, rd*rd, H, W}, opts);
-  
-  const dim3 blocks(B, (H+BLOCK_H-1)/BLOCK_H, (W+BLOCK_W-1)/BLOCK_W);
-  const dim3 threads(BLOCK_H, BLOCK_W);
+  auto corr = torch::empty({B, M, D, D, H, W}, opts);
 
-
-  AT_DISPATCH_FLOATING_TYPES_AND_HALF(fmap1.type(), "altcorr_forward_kernel", ([&] {
-    altcorr_forward_kernel<scalar_t><<<blocks, threads>>>(
-        fmap1.packed_accessor32<scalar_t,4,torch::RestrictPtrTraits>(),
-        fmap2.packed_accessor32<scalar_t,4,torch::RestrictPtrTraits>(),
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(fmap1.scalar_type(), "corr_forward_kernel", ([&] {
+      corr_forward_kernel<scalar_t><<<BLOCKS(B * M * H * W * D * D), THREADS>>>(radius,
+        fmap1.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
+        fmap2.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
         coords.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
-        corr.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
-        radius);
+        ii.packed_accessor32<long,1,torch::RestrictPtrTraits>(),
+        jj.packed_accessor32<long,1,torch::RestrictPtrTraits>(),
+        corr.packed_accessor32<scalar_t,6,torch::RestrictPtrTraits>());
   }));
 
-  return {corr};
+  torch::Tensor x = coords.index({Slice(), Slice(), 0, None, None});
+  torch::Tensor y = coords.index({Slice(), Slice(), 1, None, None});
+  torch::Tensor dx = x - x.floor(); dx = dx.to(fmap1.dtype());
+  torch::Tensor dy = y - y.floor(); dy = dy.to(fmap2.dtype());
+
+  torch::Tensor out;
+  out  = (1 - dx) * (1 - dy) * corr.index({Slice(), Slice(), Slice(0, D-1), Slice(0, D-1)});
+  out +=     (dx) * (1 - dy) * corr.index({Slice(), Slice(), Slice(0, D-1), Slice(1, D-0)});
+  out += (1 - dx) *     (dy) * corr.index({Slice(), Slice(), Slice(1, D-0), Slice(0, D-1)});
+  out +=     (dx) *     (dy) * corr.index({Slice(), Slice(), Slice(1, D-0), Slice(1, D-0)});
+
+  return { out.permute({0,1,3,2,4,5}) };
 }
+
 
 std::vector<torch::Tensor> altcorr_cuda_backward(
   torch::Tensor fmap1,
   torch::Tensor fmap2,
   torch::Tensor coords,
-  torch::Tensor corr_grad,
+  torch::Tensor ii,
+  torch::Tensor jj,
+  torch::Tensor grad,
   int radius)
 {
-  const auto B = coords.size(0);
-  const auto N = coords.size(1);
+  const int B = coords.size(0);
+  const int M = coords.size(1);
 
-  const auto H1 = fmap1.size(1);
-  const auto W1 = fmap1.size(2);
-  const auto H2 = fmap2.size(1);
-  const auto W2 = fmap2.size(2);
-  const auto C = fmap1.size(3);
+  const int H = coords.size(3);
+  const int W = coords.size(4);
+  const int D = 2 * radius + 2;
+   
+  grad = grad.permute({0,1,3,2,4,5}).contiguous();
+  torch::Tensor x = coords.index({Slice(), Slice(), 0, None, None});
+  torch::Tensor y = coords.index({Slice(), Slice(), 1, None, None});
+  torch::Tensor dx = x - x.floor();
+  torch::Tensor dy = y - y.floor();
 
-  auto opts = fmap1.options();
-  auto fmap1_grad = torch::zeros({B, H1, W1, C}, opts);
-  auto fmap2_grad = torch::zeros({B, H2, W2, C}, opts);
-  auto coords_grad = torch::zeros({B, N, H1, W1, 2}, opts);
-    
-  const dim3 blocks(B, (H1+BLOCK_H-1)/BLOCK_H, (W1+BLOCK_W-1)/BLOCK_W);
-  const dim3 threads(BLOCK_H, BLOCK_W);
+  auto opts = torch::TensorOptions().dtype(torch::kFloat).device(torch::kCUDA);
+  torch::Tensor g1 = torch::zeros({B, M, D, D, H, W}, grad.options());
+  torch::Tensor g2 = torch::zeros({B, M, D, D, H, W}, grad.options());
+  torch::Tensor g3 = torch::zeros({B, M, D, D, H, W}, grad.options());
+  torch::Tensor g4 = torch::zeros({B, M, D, D, H, W}, grad.options());
+  
+  g1.index_put_({Slice(), Slice(), Slice(0, D-1), Slice(0, D-1)}, (1 - dx) * (1 - dy) * grad);
+  g2.index_put_({Slice(), Slice(), Slice(0, D-1), Slice(1, D-0)},     (dx) * (1 - dy) * grad); 
+  g3.index_put_({Slice(), Slice(), Slice(1, D-0), Slice(0, D-1)}, (1 - dx) *     (dy) * grad);
+  g4.index_put_({Slice(), Slice(), Slice(1, D-0), Slice(1, D-0)},     (dx) *     (dy) * grad);
 
-  altcorr_backward_kernel<float><<<blocks, threads>>>(
-    fmap1.packed_accessor32<float,4,torch::RestrictPtrTraits>(),
-    fmap2.packed_accessor32<float,4,torch::RestrictPtrTraits>(),
-    coords.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
-    corr_grad.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
-    fmap1_grad.packed_accessor32<float,4,torch::RestrictPtrTraits>(),
-    fmap2_grad.packed_accessor32<float,4,torch::RestrictPtrTraits>(),
-    coords_grad.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
-    radius);
+  torch::Tensor corr_grad = g1 + g2 + g3 + g4;
+  auto fmap1_grad = torch::zeros_like(fmap1);
+  auto fmap2_grad = torch::zeros_like(fmap2);
 
-  return {fmap1_grad, fmap2_grad, coords_grad};
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(fmap1.scalar_type(), "corr_backward_kernel", ([&] {
+    corr_backward_kernel<scalar_t><<<BLOCKS(B * M * H * W * D * D), THREADS>>>(radius,
+      fmap1.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
+      fmap2.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
+      coords.packed_accessor32<float,5,torch::RestrictPtrTraits>(),
+      ii.packed_accessor32<long,1,torch::RestrictPtrTraits>(),
+      jj.packed_accessor32<long,1,torch::RestrictPtrTraits>(),
+      corr_grad.packed_accessor32<float,6,torch::RestrictPtrTraits>(),
+      fmap1_grad.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>(),
+      fmap2_grad.packed_accessor32<scalar_t,5,torch::RestrictPtrTraits>());
+  }));
+
+  return {fmap1_grad, fmap2_grad};
 }

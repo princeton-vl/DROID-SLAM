@@ -24,7 +24,7 @@ def keyframe_indicies(graph):
     return torch.as_tensor([u for u in graph])
 
 def meshgrid(m, n, device='cuda'):
-    ii, jj = torch.meshgrid(torch.arange(m), torch.arange(n))
+    ii, jj = torch.meshgrid(torch.arange(m), torch.arange(n), indexing="ij")
     return ii.reshape(-1).to(device), jj.reshape(-1).to(device)
 
 def neighbourhood_graph(n, r):
