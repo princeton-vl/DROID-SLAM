@@ -42,6 +42,8 @@ class OrbitCamera(Camera):
         """Unclamped, continuous orbit around the target."""
         self.angle_x = (self.angle_x - dx * self.mouse_sensitivity / 10.0)
         self.angle_y = (self.angle_y - dy * self.mouse_sensitivity / 10.0)
+        self.angle_y = max(min(self.angle_y, -5.0), -175.0)
+        # self.angle_y = self.angle_y.clamp()
 
     def zoom_state(self, y_offset: float) -> None:
         self.radius = max(1.0, self.radius - y_offset * self._zoom_sensitivity)

@@ -59,13 +59,18 @@ def image_stream(imagedir, calib, stride):
 
 def save_reconstruction(droid, save_path):
 
-    t = droid.video.counter.value
+    if hasattr(droid, "video2"):
+        video = droid.video2
+    else:
+        video = droid.video
+
+    t = video.counter.value
     save_data = {
-        "tstamps": droid.video.tstamp[:t].cpu(),
-        "images": droid.video.images[:t].cpu(),
-        "disps": droid.video.disps_up[:t].cpu(),
-        "poses": droid.video.poses[:t].cpu(),
-        "intrinsics": droid.video.intrinsics[:t].cpu()
+        "tstamps": video.tstamp[:t].cpu(),
+        "images": video.images[:t].cpu(),
+        "disps": video.disps_up[:t].cpu(),
+        "poses": video.poses[:t].cpu(),
+        "intrinsics": video.intrinsics[:t].cpu()
     }
 
     torch.save(save_data, save_path)

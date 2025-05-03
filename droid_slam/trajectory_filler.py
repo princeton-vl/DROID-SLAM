@@ -8,6 +8,13 @@ from factor_graph import FactorGraph
 from droid_net import DroidNet
 import geom.projective_ops as pops
 
+from functools import partial
+
+if torch.__version__.startswith("2"):
+    autocast = partial(torch.autocast, device_type="cuda")
+else:
+    autocast = torch.cuda.amp.autocast
+
 
 class PoseTrajectoryFiller:
     """ This class is used to fill in non-keyframe poses """
@@ -27,7 +34,7 @@ class PoseTrajectoryFiller:
         self.MEAN = torch.as_tensor([0.485, 0.456, 0.406], device=self.device)[:, None, None]
         self.STDV = torch.as_tensor([0.229, 0.224, 0.225], device=self.device)[:, None, None]
         
-    @torch.cuda.amp.autocast(enabled=True)
+    @autocast(enabled=True)
     def __feature_encoder(self, image):
         """ features for correlation volume """
         return self.fnet(image)

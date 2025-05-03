@@ -1,6 +1,6 @@
 [submodule "thirdparty/lietorch"]
 	path = thirdparty/lietorch
-	url = https://github.com/princeton-vl/lietorch
-[submodule "thirdparty/eigen"]
-	path = thirdparty/eigen
-	url = https://gitlab.com/libeigen/eigen.git
+	url = https://github.com/princeton-vl/lietorch.git
+[submodule "thirdparty/pytorch_scatter"]
+	path = thirdparty/pytorch_scatter
+	url = https://github.com/rusty1s/pytorch_scatter.git

@@ -2,6 +2,7 @@
 
 
 ETH_PATH=datasets/ETH3D-SLAM/training
+# ETH_PATH=/home/teedrz/data/eth3d/training
 
 # all "non-dark" training scenes
 evalset=(
