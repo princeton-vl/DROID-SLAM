@@ -97,7 +97,7 @@ Run the demo on any of the samples (all demos can be run on a GPU with 11G of me
 python view_reconstruction.py my_reconstruction.pth
 ```
 
-The frontend and backend will be run asychronously in seperate processes if run with the `--asychronous` flag. This should average real time on a single RTX3090.
+The frontend and backend will be run asynchronously in seperate processes if run with the `--asynchronous` flag. This should average real time on a single RTX3090.
 
 
 ```Bash
@@ -120,7 +120,7 @@ fx fy cx cy [k1 k2 p1 p2 [ k3 [ k4 k5 k6 ]]]
 with parameters in brackets optional.
 
 ## Evaluation
-We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir and ETH will require 24G of memory. You can run evaluation with the `--asychronous` which will average approximately real-time on EuRoC and TUM on a single RTX-3090 (ignoring the trajectory filling step which fills non-keyframe poses for evaluation purposes). Running with `--asychronous` will typically produce better results, but this mode is not deterministic.
+We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir and ETH will require 24G of memory. You can run evaluation with the `--asynchronous` which will average approximately real-time on EuRoC and TUM on a single RTX-3090 (ignoring the trajectory filling step which fills non-keyframe poses for evaluation purposes). Running with `--asynchronous` will typically produce better results, but this mode is not deterministic.
 
 ### TartanAir (Mono + Stereo)
 
