@@ -19,27 +19,42 @@ class DepthVideo:
         self.wd = wd = image_size[1]
 
         ### state attributes ###
-        self.tstamp = torch.zeros(buffer, device="cuda", dtype=torch.float).share_memory_()
-        self.images = torch.zeros(buffer, 3, ht, wd, device="cuda", dtype=torch.uint8)
-        self.dirty = torch.zeros(buffer, device="cuda", dtype=torch.bool).share_memory_()
-        self.red = torch.zeros(buffer, device="cuda", dtype=torch.bool).share_memory_()
-        self.poses = torch.zeros(buffer, 7, device="cuda", dtype=torch.float).share_memory_()
-        self.disps = torch.ones(buffer, ht//8, wd//8, device="cuda", dtype=torch.float).share_memory_()
-        self.disps_sens = torch.zeros(buffer, ht//8, wd//8, device="cuda", dtype=torch.float).share_memory_()
-        self.disps_up = torch.zeros(buffer, ht, wd, device="cuda", dtype=torch.float).share_memory_()
-        self.intrinsics = torch.zeros(buffer, 4, device="cuda", dtype=torch.float).share_memory_()
+        self.tstamp = torch.zeros(buffer, device=device, dtype=torch.float).share_memory_()
+        self.images = torch.zeros(buffer, 3, ht, wd, device=device, dtype=torch.uint8)
+        self.dirty = torch.zeros(buffer, device=device, dtype=torch.bool).share_memory_()
+        self.red = torch.zeros(buffer, device=device, dtype=torch.bool).share_memory_()
+        self.poses = torch.zeros(buffer, 7, device=device, dtype=torch.float).share_memory_()
+        self.disps = torch.ones(buffer, ht//8, wd//8, device=device, dtype=torch.float).share_memory_()
+        self.disps_sens = torch.zeros(buffer, ht//8, wd//8, device=device, dtype=torch.float).share_memory_()
+        self.disps_up = torch.zeros(buffer, ht, wd, device=device, dtype=torch.float).share_memory_()
+        self.intrinsics = torch.zeros(buffer, 4, device=device, dtype=torch.float).share_memory_()
 
         self.stereo = stereo
         c = 1 if not self.stereo else 2
 
         ### feature attributes ###
-        self.fmaps = torch.zeros(buffer, c, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
-        self.nets = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
-        self.inps = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device="cuda").share_memory_()
+        self.fmaps = torch.zeros(buffer, c, 128, ht//8, wd//8, dtype=torch.half, device=device).share_memory_()
+        self.nets = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device=device).share_memory_()
+        self.inps = torch.zeros(buffer, 128, ht//8, wd//8, dtype=torch.half, device=device).share_memory_()
 
         # initialize poses to identity transformation
-        self.poses[:] = torch.as_tensor([0, 0, 0, 0, 0, 0, 1], dtype=torch.float, device="cuda")
+        self.poses[:] = torch.as_tensor([0, 0, 0, 0, 0, 0, 1], dtype=torch.float, device=device)
         
+    def __del__(self):
+        # delete all tensors
+        del self.tstamp
+        del self.images
+        del self.dirty
+        del self.red
+        del self.poses
+        del self.disps
+        del self.disps_sens
+        del self.disps_up
+        del self.intrinsics
+        del self.fmaps
+        del self.nets
+        del self.inps
+
     def get_lock(self):
         return self.counter.get_lock()
 
@@ -153,7 +168,7 @@ class DepthVideo:
         if ii is None:
             return_matrix = True
             N = self.counter.value
-            ii, jj = torch.meshgrid(torch.arange(N), torch.arange(N))
+            ii, jj = torch.meshgrid(torch.arange(N), torch.arange(N), indexing="ij")
         
         ii, jj = DepthVideo.format_indicies(ii, jj)
 

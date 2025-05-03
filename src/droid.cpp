@@ -71,6 +71,8 @@ std::vector<torch::Tensor> altcorr_cuda_forward(
   torch::Tensor fmap1,
   torch::Tensor fmap2,
   torch::Tensor coords,
+  torch::Tensor ii,
+  torch::Tensor jj,
   int radius);
 
 std::vector<torch::Tensor> altcorr_cuda_backward(
@@ -78,7 +80,10 @@ std::vector<torch::Tensor> altcorr_cuda_backward(
   torch::Tensor fmap2,
   torch::Tensor coords,
   torch::Tensor corr_grad,
+  torch::Tensor ii,
+  torch::Tensor jj,
   int radius);
+
 
 
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
@@ -194,12 +199,14 @@ std::vector<torch::Tensor> altcorr_forward(
     torch::Tensor fmap1,
     torch::Tensor fmap2,
     torch::Tensor coords,
+    torch::Tensor ii,
+    torch::Tensor jj,
     int radius) {
   CHECK_INPUT(fmap1);
   CHECK_INPUT(fmap2);
   CHECK_INPUT(coords);
 
-  return altcorr_cuda_forward(fmap1, fmap2, coords, radius);
+  return altcorr_cuda_forward(fmap1, fmap2, coords, ii, jj, radius);
 }
 
 std::vector<torch::Tensor> altcorr_backward(
@@ -207,15 +214,16 @@ std::vector<torch::Tensor> altcorr_backward(
     torch::Tensor fmap2,
     torch::Tensor coords,
     torch::Tensor corr_grad,
+    torch::Tensor ii,
+    torch::Tensor jj,
     int radius) {
   CHECK_INPUT(fmap1);
   CHECK_INPUT(fmap2);
   CHECK_INPUT(coords);
   CHECK_INPUT(corr_grad);
 
-  return altcorr_cuda_backward(fmap1, fmap2, coords, corr_grad, radius);
+  return altcorr_cuda_backward(fmap1, fmap2, coords, ii, jj, corr_grad, radius);
 }
-
 
 torch::Tensor depth_filter(
     torch::Tensor poses,
@@ -232,6 +240,7 @@ torch::Tensor depth_filter(
 
     return depth_filter_cuda(poses, disps, intrinsics, ix, thresh);
 }
+
 
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {

@@ -20,7 +20,7 @@ Zachary Teed and Jia Deng
 }
 ```
 
-**Initial Code Release:** This repo currently provides a single GPU implementation of our monocular, stereo, and RGB-D SLAM systems. It currently contains demos, training, and evaluation scripts. 
+**Initial Code Release:** This repo currently provides a single GPU implementation of our monocular, stereo, and RGB-D SLAM systems. It contains demos, training, and evaluation scripts. 
 
 
 ## Requirements
@@ -31,22 +31,56 @@ To run the code you will need ...
 * **Training:** Training requires a GPU with at least 24G of memory. We train on 4 x RTX-3090 GPUs.
 
 ## Getting Started
-1. Clone the repo using the `--recursive` flag
+Clone the repo using the `--recursive` flag
 ```Bash
 git clone --recursive https://github.com/princeton-vl/DROID-SLAM.git
 ```
 
-2. Creating a new anaconda environment using the provided .yaml file. Use `environment_novis.yaml` to if you do not want to use the visualization
+  If you forgot `--recursive`
+  ```Bash
+  git submodule update --init --recursive .
+  ```
+
+### Installing
+
+Requires CUDA. If you run into issues, make sure the PyTorch and CUDA major versions match with the following check (minor version mismatch should be fine).
+
+```Bash
+nvidia-smi
+python -c "import torch; print(torch.version.cuda)"
+```
+
+```Bash
+python3 -m venv .venv
+source .venv/bin/activate
+
+# install requirements (tested up to torch 2.7)
+pip install -r requirements.txt
+
+# optional (for visualization)
+pip install moderngl moderngl-window
+
+# install third-party modules (this will take a while)
+pip install thirdparty/lietorch
+pip install thirdparty/pytorch_scatter
+
+# install droid-backends
+pip install -e .
+```
+
+<!-- ### Deprecated Conda Installation
+
+1. Creating a new anaconda environment using the provided .yaml file. Use `environment_novis.yaml` to if you do not want to use the visualization
 ```Bash
 conda env create -f environment.yaml
 pip install evo --upgrade --no-binary evo
 pip install gdown
 ```
 
-3. Compile the extensions (takes about 10 minutes)
+2. Compile the extensions (takes about 10 minutes)
 ```Bash
 python setup.py install
-```
+``` -->
 
 
 ## Demos
@@ -58,7 +92,12 @@ python setup.py install
 ./tools/download_sample_data.sh
 ```
 
-Run the demo on any of the samples (all demos can be run on a GPU with 11G of memory). While running, press the "s" key to increase the filtering threshold (= more points) and "a" to decrease the filtering threshold (= fewer points). To save the reconstruction with full resolution depth maps use the `--reconstruction_path` flag.
+Run the demo on any of the samples (all demos can be run on a GPU with 11G of memory). To save the reconstruction with full resolution depth maps use the `--reconstruction_path` flag. If you ran with `--reconstruction_path my_reconstruction.pth`, you can view the reconstruction in high resolution by running
+```Bash
+python view_reconstruction.py my_reconstruction.pth
+```
+
+The frontend and backend will be run asychronously in seperate processes if run with the `--asychronous` flag. This should average real time on a single RTX3090.
 
 
 ```Bash
@@ -81,7 +120,7 @@ fx fy cx cy [k1 k2 p1 p2 [ k3 [ k4 k5 k6 ]]]
 with parameters in brackets optional.
 
 ## Evaluation
-We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir and ETH will require 24G of memory.
+We provide evaluation scripts for TartanAir, EuRoC, and TUM. EuRoC and TUM can be run on a 1080Ti. The TartanAir and ETH will require 24G of memory. You can run evaluation with the `--asychronous` which will average approximately real-time on EuRoC and TUM on a single RTX-3090 (ignoring the trajectory filling step which fills non-keyframe poses for evaluation purposes). Running with `--asychronous` will typically produce better results, but this mode is not deterministic.
 
 ### TartanAir (Mono + Stereo)
 
