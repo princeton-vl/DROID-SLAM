@@ -1,0 +1,12 @@
+torch
+torchvision
+torchaudio
+wheel
+tqdm
+evo
+scipy
+open3d
+gdown
+tensorboard
+opencv-python
+pyyaml
