@@ -41,7 +41,7 @@ git clone --recursive https://github.com/princeton-vl/DROID-SLAM.git
 
 ### Installing
 
-Requires CUDA. If you run into issues, make sure the PyTorch and CUDA major versions match with the following check (minor version mismatch should be fine).
+Requires CUDA to be installed on your machine. If you run into issues, make sure the PyTorch and CUDA major versions match with the following check (minor version mismatch should be fine).
 
 ```Bash
 nvidia-smi
@@ -222,10 +222,12 @@ Download the [ETH3D](https://www.eth3d.net/slam_datasets) dataset:
 
 ```Bash
 # RGB-D eval (single gpu)
-./tools/evaluate_eth3d.sh
+./tools/evaluate_eth3d.sh > eth3d_results.txt
+python evaluation_scripts/parse_results.py eth3d_results.txt
 
 # RGB-D eval (multi gpu)
-./tools/evaluate_eth3d.sh --asynchronous --frontend_device cuda:0 --backend_device cuda:1 > tum_multi.txt
+./tools/evaluate_eth3d.sh --asynchronous --frontend_device cuda:0 --backend_device cuda:1 > eth3d_results_async.txt
+python evaluation_scripts/parse_results.py eth3d_results_async.txt
 ```
 
 ## Training

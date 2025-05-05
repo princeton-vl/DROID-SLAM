@@ -8,6 +8,8 @@ from factor_graph import FactorGraph
 from cuda_timer import CudaTimer
 
 
+ENABLE_TIMING = False
+
 class DroidFrontend:
     def __init__(self, net, video, args):
         self.video = video
@@ -66,20 +68,18 @@ class DroidFrontend:
         self.count += 1
         self.t1 += 1
 
-        with CudaTimer("rm factors", enabled=False):
-            if self.graph.corr is not None:
-                self.graph.rm_factors(self.graph.age > self.max_age, store=True)
+        if self.graph.corr is not None:
+            self.graph.rm_factors(self.graph.age > self.max_age, store=True)
 
-        with CudaTimer("add factors", enabled=False):
-            self.graph.add_proximity_factors(
-                self.t1 - 5,
-                max(self.t1 - self.frontend_window, 0),
-                rad=self.frontend_radius,
-                nms=self.frontend_nms,
-                thresh=self.frontend_thresh,
-                beta=self.beta,
-                remove=True,
-            )
+        self.graph.add_proximity_factors(
+            self.t1 - 5,
+            max(self.t1 - self.frontend_window, 0),
+            rad=self.frontend_radius,
+            nms=self.frontend_nms,
+            thresh=self.frontend_thresh,
+            beta=self.beta,
+            remove=True,
+        )
 
         self.video.disps[self.t1 - 1] = torch.where(
             self.video.disps_sens[self.t1 - 1] > 0,
@@ -87,9 +87,8 @@ class DroidFrontend:
             self.video.disps[self.t1 - 1],
         )
 
-        with CudaTimer("update 1", enabled=False):
-            for itr in range(self.iters1):
-                self.graph.update(None, None, use_inactive=True)
+        for itr in range(self.iters1):
+            self.graph.update(None, None, use_inactive=True)
 
         # set initial pose for next frame
         d = self.video.distance(
@@ -97,17 +96,16 @@ class DroidFrontend:
         )
 
         if d.item() < 2 * self.keyframe_thresh:
-            with CudaTimer("rm keyframe", enabled=False):
-                self.graph.rm_keyframe(self.t1 - 3)
+            self.graph.rm_keyframe(self.t1 - 3)
 
             with self.video.get_lock():
                 self.video.counter.value -= 1
                 self.t1 -= 1
 
         else:
-            with CudaTimer("update 2", enabled=False):
-                for itr in range(self.iters2):
-                    self.graph.update(None, None, use_inactive=True)
+            for itr in range(self.iters2):
+                self.graph.update(None, None, use_inactive=True)
+
 
         # set pose for next itration
         self.video.poses[self.t1] = self.video.poses[self.t1 - 1]

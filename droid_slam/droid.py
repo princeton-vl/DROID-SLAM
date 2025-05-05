@@ -68,9 +68,6 @@ class Droid:
             # local bundle adjustment
             self.frontend()
 
-            # global bundle adjustment
-            # self.backend()
-
     def terminate(self, stream=None):
         """ terminate the visualization process, return poses [t, q] """
 

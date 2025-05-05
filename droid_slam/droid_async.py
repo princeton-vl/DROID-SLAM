@@ -35,6 +35,7 @@ def load_network(weights, device="cuda:0"):
 
 
 def backend_process(args, depth_video1, depth_video2, device="cuda"):
+    torch.set_num_threads(8)
 
     seperate_device = False
     if device != "cuda":
@@ -45,7 +46,7 @@ def backend_process(args, depth_video1, depth_video2, device="cuda"):
         net = load_network(args.weights, device=device)
 
         # use more compute if running backend on seperate device
-        sleep_time = 5 if seperate_device else 10
+        sleep_time = 10
         num_iters = 12 if seperate_device else 8
 
         backend = DroidAsyncBackend(net, depth_video2, args)
@@ -94,7 +95,7 @@ def backend_process(args, depth_video1, depth_video2, device="cuda"):
                         device=device
                     )
                     depth_video2.disps[t0:t1] = disps1_copy[t0:t1].to(device=device) / s
-                    
+
                     depth_video2.disps_sens[t0:t1] = depth_video1.disps_sens[t0:t1].to(
                         device=device
                     )
@@ -135,6 +136,8 @@ class DroidAsync:
         net = load_network(args.weights)
         self.args = args
         self.disable_vis = args.disable_vis
+
+        torch.set_num_threads(8)
 
         self.frontend_device = (
             "cuda" if not hasattr(args, "frontend_device") else args.frontend_device
