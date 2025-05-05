@@ -19,7 +19,7 @@ else:
 class PoseTrajectoryFiller:
     """ This class is used to fill in non-keyframe poses """
 
-    def __init__(self, net, video, device="cuda:0"):
+    def __init__(self, net, video, device="cuda"):
         
         # split net modules
         self.cnet = net.cnet
@@ -43,7 +43,7 @@ class PoseTrajectoryFiller:
         """ fill operator """
 
         tt = torch.as_tensor(tstamps, device="cuda")
-        images = torch.stack(images, 0)
+        images = torch.stack(images, 0).cuda()
         intrinsics = torch.stack(intrinsics, 0)
         inputs = images[:,:,[2,1,0]].to(self.device) / 255.0
         

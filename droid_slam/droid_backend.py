@@ -43,9 +43,10 @@ class DroidBackend:
 
 
 class DroidAsyncBackend:
-    def __init__(self, net, video, args):
+    def __init__(self, net, video, args, max_age = 7):
         self.video = video
         self.update_op = net.update
+        self.max_age = max_age
 
         # global optimization window
         self.t0 = 0
@@ -82,7 +83,6 @@ class DroidAsyncBackend:
         )
 
         self.graph.update_lowmem(steps=steps, use_inactive=True)
-        self.graph.rm_factors(self.graph.age > 7, store=True)
+        self.graph.rm_factors(self.graph.age > self.max_age, store=True)
 
-        # graph.clear_edges()
         self.video.dirty[:t] = True

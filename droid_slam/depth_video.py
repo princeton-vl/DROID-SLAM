@@ -40,6 +40,23 @@ class DepthVideo:
         # initialize poses to identity transformation
         self.poses[:] = torch.as_tensor([0, 0, 0, 0, 0, 0, 1], dtype=torch.float, device=device)
         
+    def to(self, device="cuda"):
+        self.tstamp = self.tstamp.to(device=device)
+        self.images = self.images.to(device=device)
+        self.dirty = self.dirty.to(device=device)
+        self.red = self.red.to(device=device)
+        self.poses = self.poses.to(device=device)
+        self.disps = self.disps.to(device=device)
+        self.disps_sens = self.disps_sens.to(device=device)
+        self.disps_up = self.disps_up.to(device=device)
+        self.intrinsics = self.intrinsics.to(device=device)
+
+        self.fmaps = self.fmaps.to(device=device)
+        self.nets = self.nets.to(device=device)
+        self.inps = self.inps.to(device=device)
+
+        return self
+
     def __del__(self):
         # delete all tensors
         del self.tstamp

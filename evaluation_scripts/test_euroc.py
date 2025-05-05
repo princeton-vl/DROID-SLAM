@@ -57,6 +57,7 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
     images_left = sorted(glob.glob(os.path.join(datapath, 'mav0/cam0/data/*.png')))[::stride]
     images_right = [x.replace('cam0', 'cam1') for x in images_left]
 
+    data_list = []
     for t, (imgL, imgR) in enumerate(zip(images_left, images_right)):
         if stereo and not os.path.isfile(imgR):
             continue
@@ -65,17 +66,19 @@ def image_stream(datapath, image_size=[320, 512], stereo=False, stride=1):
         if stereo:
             images += [cv2.remap(cv2.imread(imgR), map_r[0], map_r[1], interpolation=cv2.INTER_LINEAR)]
         
+        images = [cv2.resize(image, (image_size[1], image_size[0])) for image in images]
         images = torch.from_numpy(np.stack(images, 0))
-        images = images.permute(0, 3, 1, 2).to("cuda:0", dtype=torch.float32)
-        images = F.interpolate(images, image_size, mode="bilinear", align_corners=False)
+        images = images.permute(0, 3, 1, 2).to(dtype=torch.float32)
         
-        intrinsics = torch.as_tensor(intrinsics_vec).cuda()
+        intrinsics = torch.as_tensor(intrinsics_vec)
         intrinsics[0] *= image_size[1] / wd0
         intrinsics[1] *= image_size[0] / ht0
         intrinsics[2] *= image_size[1] / wd0
         intrinsics[3] *= image_size[0] / ht0
 
-        yield stride*t, images, intrinsics
+        data_list.append((stride*t, images, intrinsics))
+
+    return data_list
 
 
 if __name__ == '__main__':
@@ -87,7 +90,6 @@ if __name__ == '__main__':
     parser.add_argument("--image_size", default=[320,512])
     parser.add_argument("--disable_vis", action="store_true")
     parser.add_argument("--stereo", action="store_true")
-    parser.add_argument("--asynchronous", action="store_true")
 
     parser.add_argument("--beta", type=float, default=0.3)
     parser.add_argument("--filter_thresh", type=float, default=2.4)
@@ -101,8 +103,11 @@ if __name__ == '__main__':
     parser.add_argument("--backend_thresh", type=float, default=24.0)
     parser.add_argument("--backend_radius", type=int, default=2)
     parser.add_argument("--backend_nms", type=int, default=2)
-    parser.add_argument("--upsample", action="store_true")
 
+    parser.add_argument("--upsample", action="store_true")
+    parser.add_argument("--asynchronous", action="store_true")
+    parser.add_argument("--frontend_device", type=str, default="cuda")
+    parser.add_argument("--backend_device", type=str, default="cuda")
     args = parser.parse_args()
 
     torch.multiprocessing.set_start_method('spawn')
@@ -113,10 +118,14 @@ if __name__ == '__main__':
     droid = DroidAsync(args) if args.asynchronous else Droid(args)
     scene = Path(args.datapath).name
 
-    for (t, image, intrinsics) in tqdm(image_stream(args.datapath, stereo=args.stereo, stride=2), desc=scene):
+    images = image_stream(args.datapath, stereo=args.stereo, stride=1)
+
+    # run with stride 2
+    for (t, image, intrinsics) in tqdm(images[::2], desc=scene):
         droid.track(t, image, intrinsics=intrinsics)
 
-    traj_est = droid.terminate(image_stream(args.datapath, stride=1))
+    # fill in missing poses with stride 1
+    traj_est = droid.terminate(images)
 
     ### run evaluation ###
 

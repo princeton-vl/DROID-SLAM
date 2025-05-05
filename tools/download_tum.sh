@@ -26,7 +26,7 @@ for scene in "${evalset[@]}"; do
 
     # local paths
     tarfile="${TUM_PATH}/${scene}.tgz"
-    outdir="${TUM_PATH}/${scene}"
+    outdir="${TUM_PATH}"
 
     mkdir -p "${outdir}"
 

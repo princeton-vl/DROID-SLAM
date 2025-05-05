@@ -1,8 +1,6 @@
 #!/bin/bash
 
-
-ETH_PATH=datasets/ETH3D-SLAM/training
-# ETH_PATH=/home/teedrz/data/eth3d/training
+ETH_PATH=datasets/ETH3D-SLAM
 
 # all "non-dark" training scenes
 evalset=(

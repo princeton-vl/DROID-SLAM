@@ -12,8 +12,8 @@ def extract_intrinsics(intrinsics):
 
 def coords_grid(ht, wd, **kwargs):
     y, x = torch.meshgrid(
-        torch.arange(ht).to(**kwargs).float(),
-        torch.arange(wd).to(**kwargs).float(),
+        torch.arange(ht, dtype=torch.float, **kwargs),
+        torch.arange(wd, dtype=torch.float, **kwargs),
         indexing="ij",
     )
 
@@ -26,8 +26,8 @@ def iproj(disps, intrinsics, jacobian=False):
     fx, fy, cx, cy = extract_intrinsics(intrinsics)
 
     y, x = torch.meshgrid(
-        torch.arange(ht).to(disps.device).float(),
-        torch.arange(wd).to(disps.device).float(),
+        torch.arange(ht, device=disps.device, dtype=torch.float),
+        torch.arange(wd, device=disps.device, dtype=torch.float),
         indexing="ij",
     )
 
@@ -203,10 +203,11 @@ def induced_flow(poses, disps, intrinsics, ii, jj):
 
     ht, wd = disps.shape[2:]
     y, x = torch.meshgrid(
-        torch.arange(ht).to(disps.device).float(),
-        torch.arange(wd).to(disps.device).float(),
+        torch.arange(ht, device=disps.device, dtype=torch.float),
+        torch.arange(wd, device=disps.device, dtype=torch.float),
+        indexing="ij",
     )
-
+    
     coords0 = torch.stack([x, y], dim=-1)
     coords1, valid = projective_transform(poses, disps, intrinsics, ii, jj, False)
 
