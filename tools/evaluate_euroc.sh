@@ -2,7 +2,6 @@
 
 
 EUROC_PATH=datasets/EuRoC
-# EUROC_PATH=/home/teedrz/data/EUROC
 
 evalset=(
     MH_01_easy

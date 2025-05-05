@@ -12,6 +12,7 @@
 
 #define BLOCK 16
 
+
 __forceinline__ __device__ bool within_bounds(int h, int w, int H, int W) {
   return h >= 0 && h < H && w >= 0 && w < W;
 }

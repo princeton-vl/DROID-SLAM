@@ -66,7 +66,7 @@ if __name__ == '__main__':
     parser.add_argument("--stereo", action="store_true")
     parser.add_argument("--disable_vis", action="store_true")
     parser.add_argument("--plot_curve", action="store_true")
-    parser.add_argument("--id", type=int, default=-1)
+    parser.add_argument("--scene", type=str)
 
     parser.add_argument("--beta", type=float, default=0.3)
     parser.add_argument("--filter_thresh", type=float, default=2.5)
@@ -86,6 +86,8 @@ if __name__ == '__main__':
 
     parser.add_argument("--upsample", action="store_true")
     parser.add_argument("--asynchronous", action="store_true")
+    parser.add_argument("--frontend_device", type=str, default="cuda")
+    parser.add_argument("--backend_device", type=str, default="cuda")
 
     args = parser.parse_args()
     torch.multiprocessing.set_start_method('spawn')
@@ -95,6 +97,10 @@ if __name__ == '__main__':
         os.mkdir("figures")
 
     test_scenes = STEREO_TEST_SCENES if args.stereo else MONO_TEST_SCENES
+
+    # evaluate on a specific scene
+    if args.scene is not None:
+        test_scenes = [args.scene]
 
     ate_list = []
     for scene in test_scenes:

@@ -1,8 +1,10 @@
 #!/bin/bash
+set -euo pipefail
 
-ETH_PATH=datasets/ETH3D-SLAM
+# where to put everything
+ETH3D_PATH="datasets/ETH3D-SLAM"
 
-# all "non-dark" training scenes
+# list of all sequences
 evalset=(
     cables_1
     cables_2
@@ -16,13 +18,13 @@ evalset=(
     desk_changing_1
     einstein_1
     einstein_2
-    # einstein_dark
+    einstein_dark
     einstein_flashlight
     einstein_global_light_changes_1
     einstein_global_light_changes_2
     einstein_global_light_changes_3
     kidnap_1
-    # kidnap_dark
+    kidnap_dark
     large_loop_1
     mannequin_1
     mannequin_3
@@ -41,7 +43,7 @@ evalset=(
     plant_3
     plant_4
     plant_5
-    # plant_dark
+    plant_dark
     plant_scene_1
     plant_scene_2
     plant_scene_3
@@ -56,9 +58,9 @@ evalset=(
     sofa_2
     sofa_3
     sofa_4
-    # sofa_dark_1
-    # sofa_dark_2
-    # sofa_dark_3
+    sofa_dark_1
+    sofa_dark_2
+    sofa_dark_3
     sofa_shake
     table_3
     table_4
@@ -67,10 +69,36 @@ evalset=(
     vicon_light_2
 )
 
-for seq in ${evalset[@]}; do
-    python evaluation_scripts/test_eth3d.py --datapath=$ETH_PATH/$seq --weights=droid.pth --disable_vis $@
+data_modes=(
+    mono
+    rgbd
+)
+
+# make sure base dir exists
+mkdir -p "${ETH3D_PATH}"
+
+for scene in "${evalset[@]}"; do
+
+    for mode in "${data_modes[@]}"; do 
+        url=https://www.eth3d.net/data/slam/datasets/${scene}_${mode}.zip
+
+        # local paths
+        zipfile="${ETH3D_PATH}/${scene}.zip"
+        outdir="${ETH3D_PATH}"
+
+        mkdir -p "${outdir}"
+
+        echo "Downloading ${scene}..."
+        wget -c "${url}" -O "${zipfile}"
+
+        echo " Unzipping into ${outdir}/..."
+        unzip -o "${zipfile}" -d "${outdir}"
+
+        echo " Cleaning up..."
+        rm "${zipfile}"
+
+    done
+
+    echo "✔ Done with ${scene}"
+
 done
-
-
-
-

@@ -17,7 +17,7 @@ else:
 
 
 class FactorGraph:
-    def __init__(self, video, update_op, device="cuda:0", corr_impl="volume", max_factors=-1, upsample=False):
+    def __init__(self, video, update_op, device="cuda", corr_impl="volume", max_factors=-1, upsample=False):
         self.video = video
         self.update_op = update_op
         self.device = device

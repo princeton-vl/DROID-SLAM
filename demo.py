@@ -102,7 +102,9 @@ if __name__ == '__main__':
     parser.add_argument("--backend_nms", type=int, default=3)
     parser.add_argument("--upsample", action="store_true")
     parser.add_argument("--asynchronous", action="store_true")
-
+    parser.add_argument("--frontend_device", type=str, default="cuda")
+    parser.add_argument("--backend_device", type=str, default="cuda")
+    
     parser.add_argument("--reconstruction_path", help="path to saved reconstruction")
     args = parser.parse_args()
 

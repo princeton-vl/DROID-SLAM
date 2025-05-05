@@ -2,7 +2,6 @@
 
 
 TUM_PATH=datasets/TUM-RGBD/
-# TUM_PATH=/home/teedrz/data/tum
 
 evalset=(
     rgbd_dataset_freiburg1_360
