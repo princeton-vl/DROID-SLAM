@@ -1,5 +1,7 @@
 #include <torch/extension.h>
-#include <THC/THCAtomics.cuh>
+// THC/THCAtomics.cuh was removed in torch 2.x; ATen/cuda/Atomic.cuh is the portable
+// replacement and hipify maps it to ATen/hip/Atomic.cuh on ROCm.
+#include <ATen/cuda/Atomic.cuh>
 #include <vector>
 #include <iostream>
 
